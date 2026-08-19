@@ -377,7 +377,7 @@ export default function App() {
     }
   }, [totalCourtCount, sessionActive]);
 
-  // QUEUE FILTERING LOGIC: Unplayed players (0 games) appear in all courts
+  // QUEUE FILTERING LOGIC: Pure FIFO (First-In, First-Out) based on check-in time
   const getQueueForCourt = (courtId) => {
     return checkedInQueue
       .filter((player) => {
@@ -387,14 +387,11 @@ export default function App() {
         return player.assignedCourt === courtId;
       })
       .sort((a, b) => {
-        // Prioritize players with 0 games played to the very front of the queue
-        if (a.gamesPlayed === 0 && b.gamesPlayed > 0) return -1;
-        if (b.gamesPlayed === 0 && a.gamesPlayed > 0) return 1;
-        
-        // Secondary sort by games played, then check-in time
-        return a.gamesPlayed - b.gamesPlayed || (a.checkedInAt || 0) - (b.checkedInAt || 0);
+        // Sort strictly by check-in timestamp so newly checked-in/added players go to the bottom
+        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
       });
   };
+
 
   const generateMatchForCourt = (courtId) => {
     if (!sessionActive) {
