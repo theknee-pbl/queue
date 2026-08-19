@@ -722,12 +722,18 @@ export default function App() {
                   </tr>
                 ) : (
                   [...roster]
-                    .sort((a, b) => {
+                   .sort((a, b) => {
+                      // 1. Sort by assigned court first (top to bottom)
                       if (a.assignedCourt !== b.assignedCourt) return a.assignedCourt - b.assignedCourt;
-                      if (b.wins !== a.wins) return b.wins - a.wins;
+                      
+                      // 2. Compare win percentage
                       const rateA = a.gamesPlayed > 0 ? a.wins / a.gamesPlayed : 0;
                       const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
-                      return rateB - rateA;
+                      if (rateB !== rateA) return rateB - rateA;
+
+                      // 3. If win percentage is the same, sort by total games played (or weighted court history)
+                      // Giving priority based on volume of games played within the session
+                      return b.gamesPlayed - a.gamesPlayed;
                     })
                     .map((player, index) => {
                       const winRate = player.gamesPlayed > 0 
