@@ -731,9 +731,19 @@ export default function App() {
                       const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
                       if (rateB !== rateA) return rateB - rateA;
 
-                      // 3. If win percentage is the same, sort by total games played (or weighted court history)
-                      // Giving priority based on volume of games played within the session
-                      return b.gamesPlayed - a.gamesPlayed;
+                      // 3. Tie-breaker: Weight games by higher courts (Court 1 is worth more than Court 2, etc.)
+                      const getWeightedCourtScore = (player) => {
+                        const courtGames = player.courtGames || {};
+                        let score = 0;
+                        for (const [cId, count] of Object.entries(courtGames)) {
+                          // Higher weight given to lower court IDs (e.g., Court 1)
+                          const weight = Math.max(1, totalCourtCount - parseInt(cId, 10) + 1);
+                          score += count * weight;
+                        }
+                        return score;
+                      };
+
+                      return getWeightedCourtScore(b) - getWeightedCourtScore(a);
                     })
                     .map((player, index) => {
                       const winRate = player.gamesPlayed > 0 
