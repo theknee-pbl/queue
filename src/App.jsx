@@ -24,7 +24,9 @@ import {
   Upload,
   ClipboardPaste,
   Edit2,
-  Check
+  Check,
+  Layers,
+  GitBranch
 } from 'lucide-react';
 
 // Custom Logo Component using src/assets/logo.jfif
@@ -43,6 +45,12 @@ function PBLLogo({ className = "w-20 h-20" }) {
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState('courts'); // 'courts' or 'players'
+  const [now, setNow] = useState(Date.now()); // Live clock state for 1-second UI updates
+
+  // NEW: Toggle between 'court-independent' (level/tier-based longest wait queue) and 'court-dependent' (assigned court snake draft)
+  const [queueMode, setQueueMode] = useState(() => {
+    return localStorage.getItem('pickleq_queue_mode') || 'independent'; // 'independent' or 'dependent'
+  });
 
   const [totalCourtCount, setTotalCourtCount] = useState(() => {
     return parseInt(localStorage.getItem('pickleq_court_count') || '3', 10);
@@ -70,6 +78,7 @@ export default function App() {
     return Array.from({ length: totalCourtCount }, (_, i) => ({
       id: i + 1,
       name: `Court 0${i + 1}`,
+      level: i + 1,
       teamA: [],
       teamB: [],
       isLive: false,
@@ -78,17 +87,17 @@ export default function App() {
     }));
   });
 
-  // Roster
+  // Roster combining tracking fields for both modes
   const [roster, setRoster] = useState(() => {
     const saved = localStorage.getItem('pickleq_roster');
     if (saved) return JSON.parse(saved);
     return [
-      { id: '1', name: 'Alex Rivera', rank: 95, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 1, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 6000 },
-      { id: '2', name: 'Jordan Chen', rank: 90, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 1, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 5000 },
-      { id: '3', name: 'Sam Taylor', rank: 85, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 2, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 4000 },
-      { id: '4', name: 'Morgan Smith', rank: 80, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 2, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 3000 },
-      { id: '5', name: 'Chris Lee', rank: 75, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 3, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 2000 },
-      { id: '6', name: 'Pat Gomez', rank: 70, gamesPlayed: 0, wins: 0, losses: 0, courtGames: {}, timePlayedSec: 0, assignedCourt: 3, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 1000 },
+      { id: '1', name: 'Alex Rivera', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {} },
+      { id: '2', name: 'Jordan Chen', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {} },
+      { id: '3', name: 'Sam Taylor', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {} },
+      { id: '4', name: 'Morgan Smith', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {} },
+      { id: '5', name: 'Chris Lee', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {} },
+      { id: '6', name: 'Pat Gomez', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {} },
     ];
   });
 
@@ -97,9 +106,9 @@ export default function App() {
     return parseInt(localStorage.getItem('pickleq_matches') || '0', 10);
   });
 
-  // Ref for bulk import file input
   const fileInputRef = useRef(null);
 
+  // Players currently active on any court match
   const activeCourtPlayerIds = new Set(
     courts.flatMap((c) => [...c.teamA, ...c.teamB].map((p) => p.id))
   );
@@ -109,23 +118,17 @@ export default function App() {
   );
 
   // LocalStorage Persistence
+  useEffect(() => localStorage.setItem('pickleq_queue_mode', queueMode), [queueMode]);
   useEffect(() => localStorage.setItem('pickleq_court_count', totalCourtCount.toString()), [totalCourtCount]);
   useEffect(() => localStorage.setItem('pickleq_session_active', JSON.stringify(sessionActive)), [sessionActive]);
   useEffect(() => localStorage.setItem('pickleq_courts', JSON.stringify(courts)), [courts]);
   useEffect(() => localStorage.setItem('pickleq_roster', JSON.stringify(roster)), [roster]);
   useEffect(() => localStorage.setItem('pickleq_matches', totalMatches.toString()), [totalMatches]);
 
-  // Live timer ticker for active courts play time display updates
+  // Live 1-second ticker for court timers and waiting times
   useEffect(() => {
     const interval = setInterval(() => {
-      setCourts((prevCourts) =>
-        prevCourts.map((c) => {
-          if (c.isLive && c.startTime) {
-            return { ...c };
-          }
-          return c;
-        })
-      );
+      setNow(Date.now());
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -139,6 +142,7 @@ export default function App() {
         const added = Array.from({ length: count - prevCourts.length }, (_, i) => ({
           id: prevCourts.length + i + 1,
           name: `Court 0${prevCourts.length + i + 1}`,
+          level: prevCourts.length + i + 1,
           teamA: [],
           teamB: [],
           isLive: false,
@@ -186,14 +190,8 @@ export default function App() {
     if (!targetPlayer || !targetPlayer.partnerId) return;
 
     const partnerId = targetPlayer.partnerId;
-
     setRoster((prev) =>
-      prev.map((p) => {
-        if (p.id === playerId || p.id === partnerId) {
-          return { ...p, partnerId: null };
-        }
-        return p;
-      })
+      prev.map((p) => (p.id === playerId || p.id === partnerId ? { ...p, partnerId: null } : p))
     );
   };
 
@@ -202,9 +200,9 @@ export default function App() {
     if (!sessionActive) {
       setSessionActive(true);
       setShowSummaryModal(false);
-      setTimeout(() => {
-        initializeSnakeDraftAcrossCourts();
-      }, 50);
+      if (queueMode === 'dependent') {
+        setTimeout(() => initializeSnakeDraftAcrossCourts(), 50);
+      }
     } else {
       if (window.confirm("End session and generate player stats summary?")) {
         setSessionActive(false);
@@ -213,7 +211,6 @@ export default function App() {
     }
   };
 
-  // ADD PLAYER LOGIC
   const handleAddPlayer = (e) => {
     e.preventDefault();
     if (!playerName.trim()) return;
@@ -221,16 +218,17 @@ export default function App() {
     const newPlayer = {
       id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
       name: playerName.trim(),
-      rank: 50,
       gamesPlayed: 0, 
       wins: 0,
       losses: 0,
+      level: 1, 
+      assignedCourt: totalCourtCount,
       courtGames: {},
       timePlayedSec: 0,
-      assignedCourt: totalCourtCount,
       isCheckedIn: false,
       partnerId: null,
-      checkedInAt: null
+      checkedInAt: null,
+      headToHead: {}
     };
 
     setRoster((prev) => [...prev, newPlayer]);
@@ -244,10 +242,7 @@ export default function App() {
     lines.forEach((line, index) => {
       const trimmed = line.trim();
       if (!trimmed) return;
-
-      if (index === 0 && (trimmed.toLowerCase().includes('name') || trimmed.toLowerCase().includes('player'))) {
-        return;
-      }
+      if (index === 0 && (trimmed.toLowerCase().includes('name') || trimmed.toLowerCase().includes('player'))) return;
 
       const parts = trimmed.split(/[,;\t]+/).map(p => p.trim());
       const name = parts[0];
@@ -256,16 +251,17 @@ export default function App() {
       newPlayers.push({
         id: Date.now().toString() + Math.random().toString(36).substring(2, 6) + index,
         name: name,
-        rank: 50,
         gamesPlayed: 0,
         wins: 0,
         losses: 0,
+        level: 1,
+        assignedCourt: totalCourtCount,
         courtGames: {},
         timePlayedSec: 0,
-        assignedCourt: totalCourtCount,
         isCheckedIn: false,
         partnerId: null,
-        checkedInAt: null
+        checkedInAt: null,
+        headToHead: {}
       });
     });
 
@@ -288,10 +284,7 @@ export default function App() {
       const content = event.target?.result;
       if (typeof content !== 'string') return;
       parseAndAddPlayerLines(content);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
   };
@@ -316,9 +309,9 @@ export default function App() {
       });
     });
 
-    setTimeout(() => {
-      initializeSnakeDraftAcrossCourts();
-    }, 50);
+    if (queueMode === 'dependent') {
+      setTimeout(() => initializeSnakeDraftAcrossCourts(), 50);
+    }
   };
 
   const handleRemoveFromRoster = (playerId) => {
@@ -326,12 +319,11 @@ export default function App() {
     setRoster((prev) => prev.filter((p) => p.id !== playerId));
   };
 
+  // --- DEPENDENT QUEUE INITIALIZATION (Snake Draft) ---
   const initializeSnakeDraftAcrossCourts = () => {
     const availableQueuePlayers = roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.gamesPlayed === 0 && (!p.assignedCourt || p.assignedCourt > totalCourtCount))
-      .sort((a, b) => {
-        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
-      });
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
 
     if (availableQueuePlayers.length === 0) return;
 
@@ -388,7 +380,6 @@ export default function App() {
     setRoster((prev) =>
       prev.map((player) => {
         if (player.gamesPlayed > 0 || player.assignedCourt) return player;
-        
         for (let i = 0; i < totalCourtCount; i++) {
           if (courtAssignments[i].some((p) => p.id === player.id)) {
             return { ...player, assignedCourt: i + 1 };
@@ -400,52 +391,46 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (sessionActive) {
+    if (sessionActive && queueMode === 'dependent') {
       initializeSnakeDraftAcrossCourts();
     }
-  }, [totalCourtCount, sessionActive]);
+  }, [totalCourtCount, sessionActive, queueMode]);
 
-  const getQueueForCourt = (courtId) => {
+  const getQueueForCourtDependent = (courtId) => {
     return checkedInQueue
       .filter((player) => {
         if (player.gamesPlayed === 0) return true;
         return player.assignedCourt === courtId;
       })
-      .sort((a, b) => {
-        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
-      });
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
   };
 
-  const generateMatchForCourt = (courtId) => {
-    if (!sessionActive) {
-      alert("Please click 'Start Session' first!");
-      return;
-    }
+  // --- INDEPENDENT LEVEL-BASED QUEUE HELPERS ---
+  const getQueueForLevelIndependent = (levelNum) => {
+    return roster
+      .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
+  };
 
-    const unplayedCount = checkedInQueue.filter((p) => p.gamesPlayed === 0).length;
-    if (unplayedCount > 0) {
-      initializeSnakeDraftAcrossCourts();
-    }
+  const formatWaitTime = (checkedInAt) => {
+    if (!checkedInAt) return '0m 0s';
+    const totalSec = Math.max(0, Math.floor((now - checkedInAt) / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins}m ${secs}s`;
+  };
 
-    const courtQueue = getQueueForCourt(courtId);
-    const targetCourt = courts.find(c => c.id === courtId);
-    const courtDisplayName = targetCourt ? targetCourt.name : `Court 0${courtId}`;
-
-    if (courtQueue.length < 4) {
-      alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
-      return;
-    }
-
-    let teamA = [];
-    let teamB = [];
+  const getNextMatchFromQueueIndependent = (levelNum) => {
+    const levelQueue = getQueueForLevelIndependent(levelNum);
+    if (levelQueue.length < 4) return { teamA: [], teamB: [], valid: false };
 
     const selected = [];
     const usedIds = new Set();
 
-    for (const p of courtQueue) {
+    for (const p of levelQueue) {
       if (usedIds.has(p.id)) continue;
       if (p.partnerId) {
-        const partner = courtQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
+        const partner = levelQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
         if (partner && selected.length <= 2) {
           selected.push(p, partner);
           usedIds.add(p.id);
@@ -460,11 +445,10 @@ export default function App() {
       if (selected.length >= 4) break;
     }
 
-    if (selected.length < 4) {
-      alert("Could not pair available players evenly with active fixed partners.");
-      return;
-    }
+    if (selected.length < 4) return { teamA: [], teamB: [], valid: false };
 
+    let teamA = [];
+    let teamB = [];
     if (selected[0].partnerId === selected[1].id) {
       teamA = [selected[0], selected[1]];
       teamB = [selected[2], selected[3]];
@@ -476,21 +460,136 @@ export default function App() {
       teamB = [selected[1], selected[2]];
     }
 
-    // Starts a brand new match on this court and resets the match timer via startTime = Date.now()
-    setCourts((prev) =>
-      prev.map((c) => {
-        if (c.id === courtId) {
-          return {
-            ...c,
-            teamA,
-            teamB,
-            isLive: true,
-            startTime: Date.now()
-          };
+    return { teamA, teamB, valid: true, level: levelNum };
+  };
+
+  const getPrioritizedCandidateMatchesIndependent = () => {
+    const candidateMatches = [];
+
+    for (let lvl = 1; lvl <= totalCourtCount; lvl++) {
+      const match = getNextMatchFromQueueIndependent(lvl);
+      if (match.valid) {
+        const allPlayers = [...match.teamA, ...match.teamB];
+        const minCheckedInAt = Math.min(...allPlayers.map((p) => p.checkedInAt || Date.now()));
+
+        candidateMatches.push({
+          level: lvl,
+          matchData: match,
+          minCheckedInAt
+        });
+      }
+    }
+
+    candidateMatches.sort((a, b) => {
+      if (a.minCheckedInAt !== b.minCheckedInAt) {
+        return a.minCheckedInAt - b.minCheckedInAt;
+      }
+      return b.level - a.level;
+    });
+
+    return candidateMatches;
+  };
+
+  // --- MATCH GENERATION & FINISHING ---
+  const generateMatchForCourt = (courtId) => {
+    if (!sessionActive) {
+      alert("Please click 'Start Session' first!");
+      return;
+    }
+
+    if (queueMode === 'independent') {
+      const candidateMatches = getPrioritizedCandidateMatchesIndependent();
+      if (candidateMatches.length === 0) {
+        alert(`No level queue currently has at least 4 checked-in players of the same level ready to play.`);
+        return;
+      }
+
+      const bestMatch = candidateMatches[0];
+      setCourts((prev) =>
+        prev.map((c) => {
+          if (c.id === courtId) {
+            return {
+              ...c,
+              teamA: bestMatch.matchData.teamA,
+              teamB: bestMatch.matchData.teamB,
+              level: bestMatch.level,
+              isLive: true,
+              startTime: Date.now()
+            };
+          }
+          return c;
+        })
+      );
+    } else {
+      // Court-Dependent Queue Match Generation
+      const unplayedCount = checkedInQueue.filter((p) => p.gamesPlayed === 0).length;
+      if (unplayedCount > 0) {
+        initializeSnakeDraftAcrossCourts();
+      }
+
+      const courtQueue = getQueueForCourtDependent(courtId);
+      const targetCourt = courts.find(c => c.id === courtId);
+      const courtDisplayName = targetCourt ? targetCourt.name : `Court 0${courtId}`;
+
+      if (courtQueue.length < 4) {
+        alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
+        return;
+      }
+
+      let teamA = [];
+      let teamB = [];
+      const selected = [];
+      const usedIds = new Set();
+
+      for (const p of courtQueue) {
+        if (usedIds.has(p.id)) continue;
+        if (p.partnerId) {
+          const partner = courtQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
+          if (partner && selected.length <= 2) {
+            selected.push(p, partner);
+            usedIds.add(p.id);
+            usedIds.add(partner.id);
+          } else if (!partner) {
+            continue;
+          }
+        } else {
+          selected.push(p);
+          usedIds.add(p.id);
         }
-        return c;
-      })
-    );
+        if (selected.length >= 4) break;
+      }
+
+      if (selected.length < 4) {
+        alert("Could not pair available players evenly with active fixed partners.");
+        return;
+      }
+
+      if (selected[0].partnerId === selected[1].id) {
+        teamA = [selected[0], selected[1]];
+        teamB = [selected[2], selected[3]];
+      } else if (selected[2].partnerId === selected[3].id) {
+        teamA = [selected[2], selected[3]];
+        teamB = [selected[0], selected[1]];
+      } else {
+        teamA = [selected[0], selected[3]];
+        teamB = [selected[1], selected[2]];
+      }
+
+      setCourts((prev) =>
+        prev.map((c) => {
+          if (c.id === courtId) {
+            return {
+              ...c,
+              teamA,
+              teamB,
+              isLive: true,
+              startTime: Date.now()
+            };
+          }
+          return c;
+        })
+      );
+    }
   };
 
   const handleFinishMatch = (courtId, winningTeamKey) => {
@@ -505,53 +604,106 @@ export default function App() {
       const winners = winningTeamKey === 'A' ? currentCourt.teamA : currentCourt.teamB;
       const losers = winningTeamKey === 'A' ? currentCourt.teamB : currentCourt.teamA;
 
-      const updatedMap = new Map();
+      const updatedPlayerMap = new Map();
 
-      const getNextCourt = (isWinner) => {
-        if (courtId === 1) return isWinner ? 1 : 2;
-        if (courtId === totalCourtCount) return isWinner ? courtId - 1 : courtId;
-        return isWinner ? courtId - 1 : courtId + 1;
-      };
-
-      winners.forEach((p) => {
-        updatedMap.set(p.id, {
-          isWinner: true,
-          nextCourt: getNextCourt(true)
-        });
-      });
-
-      losers.forEach((p) => {
-        updatedMap.set(p.id, {
-          isWinner: false,
-          nextCourt: getNextCourt(false)
-        });
-      });
-
-      setRoster((prevRoster) =>
-        prevRoster.map((player) => {
-          if (updatedMap.has(player.id)) {
-            const { isWinner, nextCourt } = updatedMap.get(player.id);
-            const currentCourtGames = player.courtGames || {};
-            const prevCourtCount = currentCourtGames[courtId] || 0;
-
-            return {
-              ...player,
-              gamesPlayed: player.gamesPlayed + 1,
-              wins: player.wins + (isWinner ? 1 : 0),
-              losses: player.losses + (isWinner ? 0 : 1),
-              assignedCourt: nextCourt,
-              timePlayedSec: (player.timePlayedSec || 0) + durationSec,
-              courtGames: {
-                ...currentCourtGames,
-                [courtId]: prevCourtCount + 1
-              },
-              isCheckedIn: true,
-              checkedInAt: Date.now()
-            };
+      if (queueMode === 'independent') {
+        const calculateNewLevel = (currentLevel, isWinner) => {
+          if (isWinner) {
+            return currentLevel < totalCourtCount ? currentLevel + 1 : currentLevel;
+          } else {
+            return currentLevel > 1 ? currentLevel - 1 : 1;
           }
-          return player;
-        })
-      );
+        };
+
+        winners.forEach((p) => {
+          const existing = updatedPlayerMap.get(p.id) || {};
+          updatedPlayerMap.set(p.id, { ...existing, isWinner: true, newLevel: calculateNewLevel(currentCourt.level, true) });
+        });
+
+        losers.forEach((p) => {
+          const existing = updatedPlayerMap.get(p.id) || {};
+          updatedPlayerMap.set(p.id, { ...existing, isWinner: false, newLevel: calculateNewLevel(currentCourt.level, false) });
+        });
+
+        setRoster((prevRoster) => {
+          return prevRoster.map((player) => {
+            if (updatedPlayerMap.has(player.id)) {
+              const data = updatedPlayerMap.get(player.id);
+              return {
+                ...player,
+                gamesPlayed: player.gamesPlayed + 1,
+                wins: player.wins + (data.isWinner ? 1 : 0),
+                losses: player.losses + (data.isWinner ? 0 : 1),
+                level: data.newLevel,
+                timePlayedSec: (player.timePlayedSec || 0) + durationSec,
+                isCheckedIn: true,
+                checkedInAt: Date.now()
+              };
+            }
+            return player;
+          });
+        });
+
+        // Record H2H records
+        setRoster((prevRoster) => {
+          return prevRoster.map(player => {
+            let updatedH2H = { ...(player.headToHead || {}) };
+            winners.forEach(w => {
+              losers.forEach(l => {
+                if (player.id === w.id) {
+                  if (!updatedH2H[l.id]) updatedH2H[l.id] = { winsAgainst: 0, totalAgainst: 0 };
+                  updatedH2H[l.id].winsAgainst += 1;
+                  updatedH2H[l.id].totalAgainst += 1;
+                }
+                if (player.id === l.id) {
+                  if (!updatedH2H[w.id]) updatedH2H[w.id] = { winsAgainst: 0, totalAgainst: 0 };
+                  updatedH2H[w.id].totalAgainst += 1;
+                }
+              });
+            });
+            return { ...player, headToHead: updatedH2H };
+          });
+        });
+
+      } else {
+        // Dependent Queue Ladder Movement Rules
+        const getNextCourt = (isWinner) => {
+          if (courtId === 1) return isWinner ? 1 : 2;
+          if (courtId === totalCourtCount) return isWinner ? courtId - 1 : courtId;
+          return isWinner ? courtId - 1 : courtId + 1;
+        };
+
+        winners.forEach((p) => {
+          updatedPlayerMap.set(p.id, { isWinner: true, nextCourt: getNextCourt(true) });
+        });
+
+        losers.forEach((p) => {
+          updatedPlayerMap.set(p.id, { isWinner: false, nextCourt: getNextCourt(false) });
+        });
+
+        setRoster((prevRoster) =>
+          prevRoster.map((player) => {
+            if (updatedPlayerMap.has(player.id)) {
+              const { isWinner, nextCourt } = updatedPlayerMap.get(player.id);
+              const currentCourtGames = player.courtGames || {};
+              const prevCourtCount = currentCourtGames[courtId] || 0;
+
+              return {
+                ...player,
+                gamesPlayed: player.gamesPlayed + 1,
+                wins: player.wins + (isWinner ? 1 : 0),
+                losses: player.losses + (isWinner ? 0 : 1),
+                assignedCourt: nextCourt,
+                timePlayedSec: (player.timePlayedSec || 0) + durationSec,
+                courtGames: { ...currentCourtGames, [courtId]: prevCourtCount + 1 },
+                isCheckedIn: true,
+                checkedInAt: Date.now()
+              };
+            }
+            return player;
+          })
+        );
+      }
 
       let newCourts = [...prevCourts];
       newCourts[courtIndex] = { 
@@ -576,6 +728,7 @@ export default function App() {
       setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ 
         id: i + 1, 
         name: `Court 0${i + 1}`, 
+        level: i + 1,
         teamA: [], 
         teamB: [], 
         isLive: false, 
@@ -602,17 +755,15 @@ export default function App() {
     <div className="min-h-screen bg-white text-gray-900 p-4 md:p-8 font-sans antialiased">
       {/* HEADER */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center pb-6 mb-8 border-b border-gray-200 gap-4">
-        <div>
-          <div className="flex items-center gap-4">
-            <PBLLogo className="w-24 h-24" />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-wider text-gray-900 uppercase">
-                PBL Queueing
-              </h1>
-              <p className="text-gray-500 text-sm mt-1">
-                Courts-Aware Snake First Draft • Ladder Movement
-              </p>
-            </div>
+        <div className="flex items-center gap-4">
+          <PBLLogo className="w-24 h-24" />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-wider text-gray-900 uppercase">
+              PBL Queueing
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {queueMode === 'independent' ? 'Court-Independent Level Queue & Longest-Wait Match Generation' : 'Court-Dependent Snake Draft & Ladder Match System'}
+            </p>
           </div>
         </div>
 
@@ -650,7 +801,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* IMPORT LIST DIALOG / MODAL */}
+      {/* IMPORT LIST MODAL */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-gray-200 rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl relative">
@@ -667,7 +818,7 @@ export default function App() {
             </div>
 
             <p className="text-gray-500 text-xs mb-4 leading-relaxed">
-              Paste your list of players below (one player per line). Imported players will remain unchecked by default. Alternatively, upload a file using the button below.
+              Paste your list of players below (one player per line).
             </p>
 
             <textarea
@@ -729,8 +880,8 @@ export default function App() {
           <div className="mb-6">
             <div className="flex items-center gap-3">
               <Trophy className="w-7 h-7 text-amber-500" />
-              <h2 className="text-2xl font-black text-gray-900 tracking-wide uppercase">
-                Session Final Summary
+              <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
+                Session Final Summary ({queueMode === 'independent' ? 'Level & Win Rate Ranking' : 'Court Breakdown Ranking'})
               </h2>
             </div>
             <p className="text-gray-500 text-xs mt-1">
@@ -745,53 +896,43 @@ export default function App() {
                   <th className="py-3.5 px-4">Rank</th>
                   <th className="py-3.5 px-4">Player Name</th>
                   <th className="py-3.5 px-4 text-center">Fixed Partner</th>
-                  <th className="py-3.5 px-4 text-center">Final Tier</th>
+                  <th className="py-3.5 px-4 text-center">{queueMode === 'independent' ? 'Final Level' : 'Final Tier'}</th>
                   <th className="py-3.5 px-4 text-center text-cyan-600">Games Played</th>
                   <th className="py-3.5 px-4 text-center text-emerald-600">Wins</th>
                   <th className="py-3.5 px-4 text-center text-rose-600">Losses</th>
-                  <th className="py-3.5 px-4 text-center text-amber-600">Win Rate</th>
-                  <th className="py-3.5 px-4 text-center">Court Breakdown</th>
-                  <th className="py-3.5 px-4 text-right">Time Played</th>
+                  <th className="py-3.5 px-4 text-center text-amber-600">Win Rate %</th>
+                  <th className="py-3.5 px-4 text-right">Total Play Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
                 {roster.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="py-6 text-center text-gray-400 italic">No players recorded in this session.</td>
+                    <td colSpan="9" className="py-6 text-center text-gray-400 italic">No players recorded in this session.</td>
                   </tr>
                 ) : (
                   [...roster]
                     .sort((a, b) => {
-                      if (a.assignedCourt !== b.assignedCourt) return a.assignedCourt - b.assignedCourt;
-                      const rateA = a.gamesPlayed > 0 ? a.wins / a.gamesPlayed : 0;
-                      const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
-                      if (rateB !== rateA) return rateB - rateA;
-
-                      const getWeightedCourtScore = (player) => {
-                        const courtGames = player.courtGames || {};
-                        let score = 0;
-                        for (const [cId, count] of Object.entries(courtGames)) {
-                          const weight = Math.max(1, totalCourtCount - parseInt(cId, 10) + 1);
-                          score += count * weight;
-                        }
-                        return score;
-                      };
-
-                      return getWeightedCourtScore(b) - getWeightedCourtScore(a);
+                      if (queueMode === 'independent') {
+                        if (b.level !== a.level) return b.level - a.level;
+                        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
+                        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
+                        if (winRateA !== winRateB) return winRateB - winRateA;
+                        return b.wins - a.wins;
+                      } else {
+                        if (a.assignedCourt !== b.assignedCourt) return a.assignedCourt - b.assignedCourt;
+                        const rateA = a.gamesPlayed > 0 ? a.wins / a.gamesPlayed : 0;
+                        const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
+                        return rateB - rateA;
+                      }
                     })
                     .map((player, index) => {
-                      const winRate = player.gamesPlayed > 0 
-                        ? Math.round((player.wins / player.gamesPlayed) * 100) 
-                        : 0;
+                      const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
                       const partnerName = getPartnerName(player.partnerId);
 
                       return (
                         <tr key={player.id} className="hover:bg-gray-50 transition">
                           <td className="py-3.5 px-4 font-bold text-gray-900 text-xs">#{index + 1}</td>
-                          <td className="py-3.5 px-4 font-bold text-gray-900 flex items-center gap-2">
-                            {player.assignedCourt === 1 && <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                            {player.name}
-                          </td>
+                          <td className="py-3.5 px-4 font-bold text-gray-900">{player.name}</td>
                           <td className="py-3.5 px-4 text-center">
                             {partnerName ? (
                               <span className="text-[11px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
@@ -802,29 +943,14 @@ export default function App() {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <span className={`inline-block px-2.5 py-1 rounded-md font-bold text-xs ${
-                              player.assignedCourt === 1 
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                                : player.assignedCourt === totalCourtCount
-                                ? 'bg-gray-100 text-gray-700 border border-gray-200'
-                                : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-                            }`}>
-                              {player.assignedCourt === 1 ? 'King Court (01)' : `Court 0${player.assignedCourt}`}
+                            <span className="inline-block px-2.5 py-1 rounded-md font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200">
+                              {queueMode === 'independent' ? `Level ${player.level}` : `Court 0${player.assignedCourt}`}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center font-bold text-cyan-600 text-sm">{player.gamesPlayed}</td>
                           <td className="py-3.5 px-4 text-center font-bold text-emerald-600 text-sm">{player.wins}</td>
                           <td className="py-3.5 px-4 text-center font-bold text-rose-600 text-sm">{player.losses}</td>
                           <td className="py-3.5 px-4 text-center font-semibold text-amber-600">{winRate}%</td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex justify-center gap-1 flex-wrap">
-                              {Array.from({ length: totalCourtCount }, (_, i) => i + 1).map((cId) => (
-                                <span key={cId} className="px-1.5 py-0.5 bg-gray-50 border border-gray-200 text-[10px] rounded text-gray-600 shadow-2xs">
-                                  C{cId}: <strong className="text-gray-900">{player.courtGames?.[cId] || 0}</strong>
-                                </span>
-                              ))}
-                            </div>
-                          </td>
                           <td className="py-3.5 px-4 text-right font-mono text-gray-600">
                             <span className="inline-flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-gray-400" />
@@ -846,7 +972,6 @@ export default function App() {
             >
               <Printer className="w-4 h-4" /> Print / Save Summary
             </button>
-
             <button
               onClick={() => setShowSummaryModal(false)}
               className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
@@ -863,36 +988,46 @@ export default function App() {
           <button
             onClick={() => setActiveTab('courts')}
             className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'courts'
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              activeTab === 'courts' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
-            <LayoutGrid className="w-4 h-4" /> Courts and Queue
+            <LayoutGrid className="w-4 h-4" /> Courts & Queues
           </button>
           <button
             onClick={() => setActiveTab('players')}
             className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'players'
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              activeTab === 'players' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
-            <Users className="w-4 h-4" /> Players
+            <Users className="w-4 h-4" /> Players Roster
           </button>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-          <div className="flex items-center gap-3">
-            <Settings className="w-5 h-5 text-cyan-600" />
-            <label className="text-sm font-semibold text-gray-900">Total Active Courts:</label>
+        <div className="flex items-center gap-4 flex-wrap w-full md:w-auto justify-between md:justify-start">
+          {/* QUEUE MODE SELECTOR */}
+          <div className="flex items-center gap-2">
+            <GitBranch className="w-4 h-4 text-cyan-600" />
+            <label className="text-sm font-semibold text-gray-900">Queue Match Type:</label>
+            <select
+              value={queueMode}
+              onChange={(e) => setQueueMode(e.target.value)}
+              className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
+            >
+              <option value="independent">Court-Independent (Level / Longest Wait)</option>
+              <option value="dependent">Court-Dependent (Snake Draft & Ladder)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-cyan-600" />
+            <label className="text-sm font-semibold text-gray-900">Courts:</label>
             <select
               value={totalCourtCount}
               onChange={(e) => handleCourtCountChange(e.target.value)}
               className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                <option key={num} value={num} className="bg-white text-gray-900">
+                <option key={num} value={num}>
                   {num} {num === 1 ? 'Court' : 'Courts'}
                 </option>
               ))}
@@ -904,221 +1039,244 @@ export default function App() {
       {/* MAIN CONTENT CONTAINER */}
       <main className="max-w-7xl mx-auto space-y-8">
         
-        {/* TAB 1: COURTS AND QUEUE */}
+        {/* TAB 1: COURTS AND QUEUES */}
         {activeTab === 'courts' && (
-          <section className="space-y-6 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Courts & Specific Queues
-              </h2>
-              <span className="text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md flex items-center gap-1">
-                <Crown className="w-3.5 h-3.5 text-amber-500" /> Court 01 = King Court
-              </span>
-            </div>
+          <div className="space-y-8 animate-in fade-in duration-200">
+            
+            {/* CONDITIONAL PREVIEW FOR INDEPENDENT MODE */}
+            {queueMode === 'independent' && (
+              <div className="bg-gray-50 border border-cyan-500/30 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <ListOrdered className="w-5 h-5 text-cyan-600" />
+                    <h2 className="text-base font-bold text-gray-900 uppercase tracking-wide">
+                      Next Upcoming Match Preview
+                    </h2>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {courts.map((court) => {
-                const isOccupied = court.teamA.length > 0 || court.teamB.length > 0;
-                const isKingCourt = court.id === 1;
-                const isBottomCourt = court.id === totalCourtCount;
-                const courtQueue = getQueueForCourt(court.id);
+                <div>
+                  {(() => {
+                    const candidates = getPrioritizedCandidateMatchesIndependent();
+                    const nextMatch = candidates[0] || null;
 
-                // Live elapsed time computation for current running match (resets per match when startTime updates)
-                const liveElapsedSec = court.isLive && court.startTime 
-                  ? Math.floor((Date.now() - court.startTime) / 1000) 
-                  : 0;
+                    if (!nextMatch) {
+                      return (
+                        <div className="bg-white border border-gray-200 rounded-xl p-5 text-center flex flex-col justify-center min-h-[100px]">
+                          <span className="text-xs font-bold text-gray-400">No match ready</span>
+                          <span className="text-[11px] text-gray-400 italic mt-1">Waiting for at least 4 checked-in players of the same level</span>
+                        </div>
+                      );
+                    }
 
-                return (
-                  <div
-                    key={court.id}
-                    className="relative bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col justify-between shadow-2xs transition-all"
-                  >
-                    <div>
-                      {/* COURT TITLE WITH RENAME & PLAY TIME */}
-                      <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
-                        <div className="flex flex-col flex-1 mr-2">
-                          {editingCourtId === court.id ? (
-                            <div className="flex items-center gap-1.5 my-1">
-                              <input
-                                type="text"
-                                value={tempCourtName}
-                                onChange={(e) => setTempCourtName(e.target.value)}
-                                className="bg-white border border-cyan-500 rounded px-2 py-1 text-xs font-bold text-gray-900 outline-none w-full"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleSaveCourtName(court.id)}
-                                className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setEditingCourtId(null)}
-                                className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
+                    const { matchData, level } = nextMatch;
+                    const teamANames = matchData.teamA.map(p => p.name).join(' & ');
+                    const teamBNames = matchData.teamB.map(p => p.name).join(' & ');
+
+                    return (
+                      <div className="bg-white rounded-xl p-4 shadow-2xs relative overflow-hidden border-2 border-emerald-500 ring-4 ring-emerald-500/10 bg-emerald-50/10">
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[11px] font-extrabold text-cyan-700 bg-cyan-50 border border-cyan-100 px-2.5 py-1 rounded">
+                            Top Queue Match
+                          </span>
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded">
+                            Level {level}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium text-gray-800 bg-gray-50/80 border border-gray-200 p-3 rounded-lg">
+                          <div><strong className="text-cyan-700 uppercase text-[10px] block mb-0.5">Team A:</strong> {teamANames}</div>
+                          <div><strong className="text-rose-700 uppercase text-[10px] block mb-0.5">Team B:</strong> {teamBNames}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            <div className={`grid grid-cols-1 ${queueMode === 'independent' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-8`}>
+              
+              {/* ACTIVE COURTS */}
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Active Courts
+                </h2>
+
+                <div className={`grid grid-cols-1 ${queueMode === 'dependent' ? 'md:grid-cols-2 xl:grid-cols-3' : ''} gap-4`}>
+                  {courts.map((court) => {
+                    const isOccupied = court.teamA.length > 0 || court.teamB.length > 0;
+                    const liveElapsedSec = court.isLive && court.startTime ? Math.max(0, Math.floor((now - court.startTime) / 1000)) : 0;
+                    const courtQueue = queueMode === 'dependent' ? getQueueForCourtDependent(court.id) : [];
+
+                    return (
+                      <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                {editingCourtId === court.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={tempCourtName}
+                                      onChange={(e) => setTempCourtName(e.target.value)}
+                                      className="bg-white border border-cyan-500 rounded px-2 py-1 text-xs font-bold text-gray-900 outline-none"
+                                      autoFocus
+                                    />
+                                    <button onClick={() => handleSaveCourtName(court.id)} className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"><Check className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => setEditingCourtId(null)} className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-base text-gray-900">{court.name}</span>
+                                    {queueMode === 'independent' && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                                        Lvl {court.level}
+                                      </span>
+                                    )}
+                                    <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-1 rounded">
+                                <Clock className="w-3 h-3 inline text-cyan-600 mr-1" /> {formatDuration(liveElapsedSec)}
+                              </span>
+                              {isOccupied ? (
+                                <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2.5 py-0.5 rounded-full">
+                                  Ready
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {isOccupied ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-2">
+                              <div className="bg-white border-l-4 border-cyan-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
+                                <span className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider block mb-1">Team A</span>
+                                {court.teamA.map((p) => (
+                                  <div key={p.id} className="text-xs py-0.5 font-semibold text-gray-800 truncate">
+                                    {p.name} {p.partnerId && <Link className="w-3 h-3 inline text-cyan-600 ml-1" />}
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={() => handleFinishMatch(court.id, 'A')}
+                                  className="mt-2 w-full py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-[11px] rounded border border-cyan-200 transition flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" /> Team A Wins
+                                </button>
+                              </div>
+
+                              <div className="bg-white border-l-4 border-rose-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
+                                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block mb-1">Team B</span>
+                                {court.teamB.map((p) => (
+                                  <div key={p.id} className="text-xs py-0.5 font-semibold text-gray-800 truncate">
+                                    {p.name} {p.partnerId && <Link className="w-3 h-3 inline text-rose-600 ml-1" />}
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={() => handleFinishMatch(court.id, 'B')}
+                                  className="mt-2 w-full py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded border border-rose-200 transition flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" /> Team B Wins
+                                </button>
+                              </div>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 group">
-                              <span className="font-extrabold text-base text-gray-900 truncate">
-                                {court.name || `Court 0${court.id}`}
-                              </span>
+                            <div className="py-3 px-2 text-center border-2 border-dashed border-gray-200 rounded-xl my-2">
                               <button
-                                onClick={() => {
-                                  setEditingCourtId(court.id);
-                                  setTempCourtName(court.name || `Court 0${court.id}`);
-                                }}
-                                className="text-gray-400 hover:text-cyan-600 transition cursor-pointer p-0.5"
-                                title="Rename Court"
+                                onClick={() => generateMatchForCourt(court.id)}
+                                disabled={!sessionActive || (queueMode === 'dependent' && courtQueue.length < 4)}
+                                className="w-full py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Sparkles className="w-3.5 h-3.5" /> Pull Next Match to {court.name} {queueMode === 'dependent' ? `(${courtQueue.length}/4)` : ''}
                               </button>
                             </div>
                           )}
-
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {isKingCourt ? (
-                              <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider flex items-center gap-0.5">
-                                <Crown className="w-2.5 h-2.5" /> King Court
-                              </span>
-                            ) : isBottomCourt ? (
-                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                                Bottom Court
-                              </span>
-                            ) : (
-                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                                Middle Court
-                              </span>
-                            )}
-                            <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1 bg-white border border-gray-200 px-1.5 py-0.2 rounded">
-                              <Clock className="w-2.5 h-2.5 text-cyan-600" /> {formatDuration(liveElapsedSec)}
-                            </span>
-                          </div>
                         </div>
-                        
-                        {isOccupied ? (
-                          <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2 py-0.5 rounded-full shrink-0">
-                            Ready
-                          </span>
+
+                        {/* Court-dependent Queue list preview per court */}
+                        {queueMode === 'dependent' && (
+                          <div className="mt-3 pt-2.5 border-t border-gray-200">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[11px] font-bold text-gray-700">Court Queue ({courtQueue.length})</span>
+                            </div>
+                            <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                              {courtQueue.map((p, idx) => (
+                                <div key={p.id} className="flex justify-between items-center px-2 py-1 bg-white border border-gray-200 rounded text-[11px]">
+                                  <span className="font-medium text-gray-800">#{idx + 1} {p.name}</span>
+                                  <span className="text-[9px] text-cyan-600 font-mono">{p.gamesPlayed}G</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      {/* LIVE MATCH */}
-                      {isOccupied ? (
-                        <div className="space-y-2.5 my-2">
-                          <div className="bg-white border-l-4 border-cyan-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
-                            <span className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider block mb-1">
-                              Team A
+              {/* QUEUES DISPLAY PANEL (Visible only in independent mode) */}
+              {queueMode === 'independent' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-cyan-600" /> Level Queues (Waiting Lists)
+                  </h2>
+
+                  <div className="space-y-4">
+                    {Array.from({ length: totalCourtCount }, (_, i) => i + 1).map((lvl) => {
+                      const levelQueue = getQueueForLevelIndependent(lvl);
+                      return (
+                        <div key={`level-q-${lvl}`} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+                          <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-200">
+                            <span className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                              <Crown className="w-4 h-4 text-amber-500" /> Level {lvl} Queue
                             </span>
-                            {court.teamA.map((p) => (
-                              <div key={p.id} className="flex justify-between text-xs py-0.5">
-                                <span className="font-semibold text-gray-800 truncate flex items-center gap-1 max-w-[150px]">
-                                  {p.partnerId && <Link className="w-3 h-3 text-cyan-600 shrink-0" />} {p.name}
-                                </span>
-                              </div>
-                            ))}
-                            
-                            <button
-                              onClick={() => handleFinishMatch(court.id, 'A')}
-                              className="mt-2 w-full py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-[11px] rounded border border-cyan-200 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                            >
-                              <CheckCircle2 className="w-3 h-3" /> Team A Wins
-                            </button>
+                            <span className="text-xs font-bold px-2.5 py-0.5 bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-full">
+                              {levelQueue.length} waiting
+                            </span>
                           </div>
 
-                          <div className="text-center text-[9px] font-black text-gray-400 tracking-widest">VS</div>
-
-                          <div className="bg-white border-l-4 border-rose-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
-                            <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block mb-1">
-                              Team B
-                            </span>
-                            {court.teamB.map((p) => (
-                              <div key={p.id} className="flex justify-between text-xs py-0.5">
-                                <span className="font-semibold text-gray-800 truncate flex items-center gap-1 max-w-[150px]">
-                                  {p.partnerId && <Link className="w-3 h-3 text-rose-600 shrink-0" />} {p.name}
-                                </span>
-                              </div>
-                            ))}
-
-                            <button
-                              onClick={() => handleFinishMatch(court.id, 'B')}
-                              className="mt-2 w-full py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded border border-rose-200 transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                            >
-                              <CheckCircle2 className="w-3 h-3" /> Team B Wins
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="py-4 px-2 text-center border-2 border-dashed border-gray-200 rounded-xl my-2 flex flex-col items-center justify-center gap-3">
-                          <button
-                            onClick={() => generateMatchForCourt(court.id)}
-                            disabled={!sessionActive || courtQueue.length < 4}
-                            className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                              sessionActive && courtQueue.length >= 4
-                                ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm shadow-cyan-900/10'
-                                : 'bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed'
-                            }`}
-                          >
-                            <Sparkles className="w-3.5 h-3.5" /> Start Match ({courtQueue.length}/4)
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* QUEUE */}
-                    <div className="mt-3 pt-2.5 border-t border-gray-200">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
-                          <ListOrdered className="w-3 h-3 text-cyan-600" /> Queue
-                        </span>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.2 bg-gray-200 text-gray-700 rounded-md border border-gray-300">
-                          {courtQueue.length}
-                        </span>
-                      </div>
-
-                      {courtQueue.length === 0 ? (
-                        <p className="text-[10px] text-gray-400 italic py-2 text-center">Empty queue</p>
-                      ) : (
-                        <div className="space-y-1 max-h-[120px] overflow-y-auto pr-1">
-                          {courtQueue.map((player, idx) => (
-                            <div
-                              key={player.id}
-                              className={`flex justify-between items-center px-2 py-1 rounded-md border text-[11px] ${
-                                player.gamesPlayed === 0
-                                  ? 'bg-cyan-50/60 border-cyan-200/80'
-                                  : 'bg-white border-gray-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5 truncate">
-                                <span className="font-bold text-gray-400 text-[9px]">#{idx + 1}</span>
-                                <span className="font-medium text-gray-800 truncate flex items-center gap-1">
-                                  {player.partnerId && <Link className="w-2.5 h-2.5 text-amber-500 shrink-0" />} {player.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <span className="text-[9px] bg-gray-100 text-cyan-700 px-1 py-0.2 rounded font-mono border border-gray-200">
-                                  {player.gamesPlayed}G
-                                </span>
-                              </div>
+                          {levelQueue.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic py-3 text-center">No players currently in Level {lvl} queue</p>
+                          ) : (
+                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                              {levelQueue.map((player, idx) => (
+                                <div key={player.id} className="flex justify-between items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span className="font-bold text-gray-400">#{idx + 1}</span>
+                                    <span className="font-bold text-gray-800 truncate">
+                                      {player.name} {player.partnerId && <Link className="w-3 h-3 inline text-amber-500 ml-1" />}
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
-                    </div>
-
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
             </div>
-          </section>
+          </div>
         )}
 
-        {/* TAB 2: PLAYERS */}
+        {/* TAB 2: PLAYERS ROSTER */}
         {activeTab === 'players' && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
             
@@ -1128,12 +1286,10 @@ export default function App() {
                   <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                     <UserPlus className="w-5 h-5 text-cyan-600" /> Add Player
                   </h2>
-
                   <button
                     type="button"
                     onClick={() => setShowImportModal(true)}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    title="Import or Paste Player List"
                   >
                     <Upload className="w-3.5 h-3.5" /> Import List
                   </button>
@@ -1172,11 +1328,9 @@ export default function App() {
                       onChange={(e) => setPartnerP1(e.target.value)}
                       className="bg-white border border-gray-200 text-xs rounded-xl px-3 py-2 text-gray-900 outline-none focus:border-cyan-500"
                     >
-                      <option value="" className="bg-white text-gray-900">Select Player 1</option>
+                      <option value="">Select Player 1</option>
                       {roster.map((p) => (
-                        <option key={p.id} value={p.id} className="bg-white text-gray-900">
-                          {p.name} {p.partnerId ? '(Paired)' : ''}
-                        </option>
+                        <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
 
@@ -1185,11 +1339,9 @@ export default function App() {
                       onChange={(e) => setPartnerP2(e.target.value)}
                       className="bg-white border border-gray-200 text-xs rounded-xl px-3 py-2 text-gray-900 outline-none focus:border-cyan-500"
                     >
-                      <option value="" className="bg-white text-gray-900">Select Player 2</option>
+                      <option value="">Select Player 2</option>
                       {roster.map((p) => (
-                        <option key={p.id} value={p.id} className="bg-white text-gray-900">
-                          {p.name} {p.partnerId ? '(Paired)' : ''}
-                        </option>
+                        <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1222,9 +1374,7 @@ export default function App() {
                         <div
                           key={player.id}
                           className={`flex justify-between items-center p-3 rounded-xl border transition ${
-                            player.isCheckedIn 
-                              ? 'bg-emerald-50/60 border-emerald-200' 
-                              : 'bg-white border-gray-200'
+                            player.isCheckedIn ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-gray-200'
                           }`}
                         >
                           <div>
@@ -1237,50 +1387,39 @@ export default function App() {
                                 <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md flex items-center gap-1">
                                   <Link className="w-3 h-3" /> Partner: {partnerName}
                                 </span>
-                                <button
-                                  onClick={() => handleUnlinkPartner(player.id)}
-                                  className="text-[10px] text-gray-400 hover:text-rose-600 p-0.5 transition cursor-pointer"
-                                  title="Unlink Fixed Partner"
-                                >
+                                <button onClick={() => handleUnlinkPartner(player.id)} className="text-[10px] text-gray-400 hover:text-rose-600 p-0.5 transition cursor-pointer">
                                   <Unlink className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             )}
 
                             <div className="text-[10px] text-gray-500 mt-0.5">
-                              W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | Tier: {' '}
-                              <span className="text-amber-600 font-bold">
-                                {player.gamesPlayed === 0 ? `Court ${player.assignedCourt}` : `Court 0${player.assignedCourt}`}
-                              </span>
+                              W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | {queueMode === 'independent' ? `Level: ${player.level}` : `Court: ${player.assignedCourt}`}
+                              {player.isCheckedIn && !isPlaying && (
+                                <span className="text-cyan-700 font-mono font-bold ml-1">
+                                  ({formatWaitTime(player.checkedInAt)})
+                                </span>
+                              )}
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
                             {isPlaying ? (
                               <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg">
-                                On Court Header
+                                On Court
                               </span>
                             ) : (
                               <button
                                 onClick={() => handleToggleCheckIn(player.id)}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                                  player.isCheckedIn
-                                    ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
-                                    : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                  player.isCheckedIn ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' : 'bg-emerald-600 text-white hover:bg-emerald-500'
                                 }`}
                               >
-                                {player.isCheckedIn ? (
-                                  <><UserX className="w-3.5 h-3.5" /> Check Out</>
-                                ) : (
-                                  <><UserCheck className="w-3.5 h-3.5" /> Check In</>
-                                )}
+                                {player.isCheckedIn ? <><UserX className="w-3.5 h-3.5" /> Check Out</> : <><UserCheck className="w-3.5 h-3.5" /> Check In</>}
                               </button>
                             )}
 
-                            <button
-                              onClick={() => handleRemoveFromRoster(player.id)}
-                              className="p-1 text-gray-400 hover:text-rose-600 transition cursor-pointer"
-                            >
+                            <button onClick={() => handleRemoveFromRoster(player.id)} className="p-1 text-gray-400 hover:text-rose-600 transition cursor-pointer">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -1296,7 +1435,6 @@ export default function App() {
         )}
 
       </main>
-
     </div>
   );
 }
