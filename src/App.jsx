@@ -22,7 +22,9 @@ import {
   Unlink,
   LayoutGrid,
   Upload,
-  ClipboardPaste
+  ClipboardPaste,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 // Custom Logo Component using src/assets/logo.jfif
@@ -54,6 +56,10 @@ export default function App() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importTextContent, setImportTextContent] = useState('');
 
+  // State to handle inline editing of court names
+  const [editingCourtId, setEditingCourtId] = useState(null);
+  const [tempCourtName, setTempCourtName] = useState('');
+
   // Fixed Partnering selections
   const [partnerP1, setPartnerP1] = useState('');
   const [partnerP2, setPartnerP2] = useState('');
@@ -63,10 +69,12 @@ export default function App() {
     if (saved) return JSON.parse(saved);
     return Array.from({ length: totalCourtCount }, (_, i) => ({
       id: i + 1,
+      name: `Court 0${i + 1}`,
       teamA: [],
       teamB: [],
       isLive: false,
-      startTime: null
+      startTime: null,
+      totalPlayTimeSec: 0
     }));
   });
 
@@ -85,7 +93,6 @@ export default function App() {
   });
 
   const [playerName, setPlayerName] = useState('');
-  const [playerRank, setPlayerRank] = useState('');
   const [totalMatches, setTotalMatches] = useState(() => {
     return parseInt(localStorage.getItem('pickleq_matches') || '0', 10);
   });
@@ -108,6 +115,21 @@ export default function App() {
   useEffect(() => localStorage.setItem('pickleq_roster', JSON.stringify(roster)), [roster]);
   useEffect(() => localStorage.setItem('pickleq_matches', totalMatches.toString()), [totalMatches]);
 
+  // Live timer ticker for active courts play time display updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCourts((prevCourts) =>
+        prevCourts.map((c) => {
+          if (c.isLive && c.startTime) {
+            return { ...c };
+          }
+          return c;
+        })
+      );
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleCourtCountChange = (newCount) => {
     const count = Math.max(1, Math.min(10, parseInt(newCount, 10) || 1));
     setTotalCourtCount(count);
@@ -116,16 +138,27 @@ export default function App() {
       if (count > prevCourts.length) {
         const added = Array.from({ length: count - prevCourts.length }, (_, i) => ({
           id: prevCourts.length + i + 1,
+          name: `Court 0${prevCourts.length + i + 1}`,
           teamA: [],
           teamB: [],
           isLive: false,
-          startTime: null
+          startTime: null,
+          totalPlayTimeSec: 0
         }));
         return [...prevCourts, ...added];
       } else {
         return prevCourts.slice(0, count);
       }
     });
+  };
+
+  const handleSaveCourtName = (courtId) => {
+    if (!tempCourtName.trim()) return;
+    setCourts((prev) =>
+      prev.map((c) => (c.id === courtId ? { ...c, name: tempCourtName.trim() } : c))
+    );
+    setEditingCourtId(null);
+    setTempCourtName('');
   };
 
   // FIXED PARTNER HANDLERS
@@ -180,7 +213,7 @@ export default function App() {
     }
   };
 
-  // ADD PLAYER LOGIC (Default rank is 50 internally, but input field is removed/hidden)
+  // ADD PLAYER LOGIC
   const handleAddPlayer = (e) => {
     e.preventDefault();
     if (!playerName.trim()) return;
@@ -204,7 +237,6 @@ export default function App() {
     setPlayerName('');
   };
 
-  // PROCESS RAW TEXT OR IMPORTED FILE CONTENT INTO ROSTER
   const parseAndAddPlayerLines = (rawContent) => {
     const lines = rawContent.split(/\r?\n/);
     const newPlayers = [];
@@ -247,7 +279,6 @@ export default function App() {
     }
   };
 
-  // BULK IMPORT FILE UPLOAD
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -295,9 +326,7 @@ export default function App() {
     setRoster((prev) => prev.filter((p) => p.id !== playerId));
   };
 
-  // SAFE SEQUENTIAL CHECK-IN DRAFT ASSIGNMENT ACROSS ALL COURTS
   const initializeSnakeDraftAcrossCourts = () => {
-    // 1. Grab ALL checked-in players who are waiting and have NOT played yet and lack a court assignment
     const availableQueuePlayers = roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.gamesPlayed === 0 && (!p.assignedCourt || p.assignedCourt > totalCourtCount))
       .sort((a, b) => {
@@ -356,7 +385,6 @@ export default function App() {
       }
     });
 
-    // Update roster assignments only for unassigned players
     setRoster((prev) =>
       prev.map((player) => {
         if (player.gamesPlayed > 0 || player.assignedCourt) return player;
@@ -377,21 +405,16 @@ export default function App() {
     }
   }, [totalCourtCount, sessionActive]);
 
-  // QUEUE FILTERING LOGIC: Pure FIFO (First-In, First-Out) based on check-in time
   const getQueueForCourt = (courtId) => {
     return checkedInQueue
       .filter((player) => {
-        // If the player has 0 games played, they show up in all court queues
         if (player.gamesPlayed === 0) return true;
-        // Otherwise, they only show up on their assigned court based on ladder movement
         return player.assignedCourt === courtId;
       })
       .sort((a, b) => {
-        // Sort strictly by check-in timestamp so newly checked-in/added players go to the bottom
         return (a.checkedInAt || 0) - (b.checkedInAt || 0);
       });
   };
-
 
   const generateMatchForCourt = (courtId) => {
     if (!sessionActive) {
@@ -405,9 +428,11 @@ export default function App() {
     }
 
     const courtQueue = getQueueForCourt(courtId);
+    const targetCourt = courts.find(c => c.id === courtId);
+    const courtDisplayName = targetCourt ? targetCourt.name : `Court 0${courtId}`;
 
     if (courtQueue.length < 4) {
-      alert(`Court 0${courtId} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
+      alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
       return;
     }
 
@@ -451,6 +476,7 @@ export default function App() {
       teamB = [selected[1], selected[2]];
     }
 
+    // Starts a brand new match on this court and resets the match timer via startTime = Date.now()
     setCourts((prev) =>
       prev.map((c) => {
         if (c.id === courtId) {
@@ -467,7 +493,6 @@ export default function App() {
     );
   };
 
-  // FINISH MATCH
   const handleFinishMatch = (courtId, winningTeamKey) => {
     setCourts((prevCourts) => {
       const courtIndex = prevCourts.findIndex((c) => c.id === courtId);
@@ -529,7 +554,14 @@ export default function App() {
       );
 
       let newCourts = [...prevCourts];
-      newCourts[courtIndex] = { ...currentCourt, teamA: [], teamB: [], isLive: false, startTime: null };
+      newCourts[courtIndex] = { 
+        ...currentCourt, 
+        teamA: [], 
+        teamB: [], 
+        isLive: false, 
+        startTime: null,
+        totalPlayTimeSec: (currentCourt.totalPlayTimeSec || 0) + durationSec
+      };
 
       setTotalMatches((prev) => prev + 1);
       return newCourts;
@@ -541,7 +573,15 @@ export default function App() {
       localStorage.clear();
       setSessionActive(false);
       setShowSummaryModal(false);
-      setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ id: i + 1, teamA: [], teamB: [], isLive: false, startTime: null })));
+      setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ 
+        id: i + 1, 
+        name: `Court 0${i + 1}`, 
+        teamA: [], 
+        teamB: [], 
+        isLive: false, 
+        startTime: null,
+        totalPlayTimeSec: 0 
+      })));
       setRoster([]);
       setTotalMatches(0);
     }
@@ -638,7 +678,6 @@ export default function App() {
               className="w-full bg-gray-50 border border-gray-200 focus:border-cyan-500 rounded-xl p-3.5 text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition mb-4 resize-y"
             ></textarea>
 
-            {/* Hidden file input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -722,21 +761,16 @@ export default function App() {
                   </tr>
                 ) : (
                   [...roster]
-                   .sort((a, b) => {
-                      // 1. Sort by assigned court first (top to bottom)
+                    .sort((a, b) => {
                       if (a.assignedCourt !== b.assignedCourt) return a.assignedCourt - b.assignedCourt;
-                      
-                      // 2. Compare win percentage
                       const rateA = a.gamesPlayed > 0 ? a.wins / a.gamesPlayed : 0;
                       const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
                       if (rateB !== rateA) return rateB - rateA;
 
-                      // 3. Tie-breaker: Weight games by higher courts (Court 1 is worth more than Court 2, etc.)
                       const getWeightedCourtScore = (player) => {
                         const courtGames = player.courtGames || {};
                         let score = 0;
                         for (const [cId, count] of Object.entries(courtGames)) {
-                          // Higher weight given to lower court IDs (e.g., Court 1)
                           const weight = Math.max(1, totalCourtCount - parseInt(cId, 10) + 1);
                           score += count * weight;
                         }
@@ -825,7 +859,6 @@ export default function App() {
 
       {/* SETTINGS BAR & TABS */}
       <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xs">
-        {/* TABS SELECTION */}
         <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto">
           <button
             onClick={() => setActiveTab('courts')}
@@ -849,7 +882,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* COURT COUNT SETTING */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
           <div className="flex items-center gap-3">
             <Settings className="w-5 h-5 text-cyan-600" />
@@ -891,43 +923,86 @@ export default function App() {
                 const isBottomCourt = court.id === totalCourtCount;
                 const courtQueue = getQueueForCourt(court.id);
 
+                // Live elapsed time computation for current running match (resets per match when startTime updates)
+                const liveElapsedSec = court.isLive && court.startTime 
+                  ? Math.floor((Date.now() - court.startTime) / 1000) 
+                  : 0;
+
                 return (
                   <div
                     key={court.id}
-                    className={`relative bg-gray-50 border rounded-2xl p-4 flex flex-col justify-between shadow-2xs transition-all ${
-                      isKingCourt
-                        ? 'border-amber-400 shadow-amber-500/5 ring-1 ring-amber-300'
-                        : 'border-gray-200'
-                    }`}
+                    className="relative bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col justify-between shadow-2xs transition-all"
                   >
                     <div>
-                      {/* COURT TITLE */}
+                      {/* COURT TITLE WITH RENAME & PLAY TIME */}
                       <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
-                        <div className="flex flex-col">
-                          <span className="font-extrabold text-base text-gray-900">
-                            Court 0{court.id}
-                          </span>
-                          {isKingCourt ? (
-                            <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider flex items-center gap-0.5">
-                              <Crown className="w-2.5 h-2.5" /> King Court
-                            </span>
-                          ) : isBottomCourt ? (
-                            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                              Bottom Court
-                            </span>
+                        <div className="flex flex-col flex-1 mr-2">
+                          {editingCourtId === court.id ? (
+                            <div className="flex items-center gap-1.5 my-1">
+                              <input
+                                type="text"
+                                value={tempCourtName}
+                                onChange={(e) => setTempCourtName(e.target.value)}
+                                className="bg-white border border-cyan-500 rounded px-2 py-1 text-xs font-bold text-gray-900 outline-none w-full"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleSaveCourtName(court.id)}
+                                className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setEditingCourtId(null)}
+                                className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           ) : (
-                            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                              Middle Court
-                            </span>
+                            <div className="flex items-center gap-2 group">
+                              <span className="font-extrabold text-base text-gray-900 truncate">
+                                {court.name || `Court 0${court.id}`}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setEditingCourtId(court.id);
+                                  setTempCourtName(court.name || `Court 0${court.id}`);
+                                }}
+                                className="text-gray-400 hover:text-cyan-600 transition cursor-pointer p-0.5"
+                                title="Rename Court"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
+
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {isKingCourt ? (
+                              <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider flex items-center gap-0.5">
+                                <Crown className="w-2.5 h-2.5" /> King Court
+                              </span>
+                            ) : isBottomCourt ? (
+                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                                Bottom Court
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                                Middle Court
+                              </span>
+                            )}
+                            <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1 bg-white border border-gray-200 px-1.5 py-0.2 rounded">
+                              <Clock className="w-2.5 h-2.5 text-cyan-600" /> {formatDuration(liveElapsedSec)}
+                            </span>
+                          </div>
                         </div>
                         
                         {isOccupied ? (
-                          <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
                           </span>
                         ) : (
-                          <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2 py-0.5 rounded-full">
+                          <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2 py-0.5 rounded-full shrink-0">
                             Ready
                           </span>
                         )}
@@ -936,7 +1011,6 @@ export default function App() {
                       {/* LIVE MATCH */}
                       {isOccupied ? (
                         <div className="space-y-2.5 my-2">
-                          {/* TEAM A */}
                           <div className="bg-white border-l-4 border-cyan-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
                             <span className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider block mb-1">
                               Team A
@@ -959,7 +1033,6 @@ export default function App() {
 
                           <div className="text-center text-[9px] font-black text-gray-400 tracking-widest">VS</div>
 
-                          {/* TEAM B */}
                           <div className="bg-white border-l-4 border-rose-500 border-y border-r border-gray-200 p-2.5 rounded-lg shadow-2xs">
                             <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block mb-1">
                               Team B
@@ -1049,7 +1122,6 @@ export default function App() {
         {activeTab === 'players' && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
             
-            {/* COLUMN 1: ADD PLAYER & BULK IMPORT TRIGGER */}
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs">
               <div>
                 <div className="flex justify-between items-center mb-4">
@@ -1087,7 +1159,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* COLUMN 2: FIX PARTNER PAIRING CONTROL */}
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs">
               <div>
                 <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
@@ -1133,7 +1204,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* COLUMN 3: ROSTER */}
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -1188,7 +1258,7 @@ export default function App() {
                           <div className="flex items-center gap-2">
                             {isPlaying ? (
                               <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg">
-                                On Court
+                                On Court Header
                               </span>
                             ) : (
                               <button
