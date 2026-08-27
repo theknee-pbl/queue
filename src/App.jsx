@@ -131,7 +131,10 @@ export default function App() {
       return 0;
     };
 
-    const sorted = [...roster].sort((a, b) => {
+    // Filter out players who have never been checked in at all (isCheckedIn is false and gamesPlayed is 0)
+    const eligibleRoster = roster.filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
+
+    const sorted = [...eligibleRoster].sort((a, b) => {
       // 1. Level / Tier: Higher level ranks higher
       if (b.level !== a.level) {
         return b.level - a.level;
@@ -1041,7 +1044,7 @@ export default function App() {
               </h2>
             </div>
             <p className="text-gray-500 text-xs mt-1">
-              Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Total Players: <span className="text-cyan-600 font-bold">{roster.length}</span>
+              Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Ranked Players: <span className="text-cyan-600 font-bold">{rankedRoster.length}</span>
             </p>
           </div>
 
@@ -1064,7 +1067,7 @@ export default function App() {
               <tbody className="divide-y divide-gray-100 font-medium">
                 {rankedRoster.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="py-6 text-center text-gray-400 italic">No players recorded in this session.</td>
+                    <td colSpan="10" className="py-6 text-center text-gray-400 italic">No checked-in players recorded in this session.</td>
                   </tr>
                 ) : (
                   rankedRoster.map((player) => {
@@ -1584,7 +1587,7 @@ export default function App() {
                 <Trophy className="w-5 h-5 text-amber-500" /> Leaderboard
               </h2>
               <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-xl">
-                {roster.length} Players
+                {rankedRoster.length} Ranked
               </span>
             </div>
 
@@ -1605,7 +1608,7 @@ export default function App() {
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {rankedRoster.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="py-8 text-center text-gray-400 italic">No players in roster.</td>
+                        <td colSpan="7" className="py-8 text-center text-gray-400 italic">No checked-in players to rank.</td>
                       </tr>
                     ) : (
                       rankedRoster.map((player) => {
