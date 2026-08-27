@@ -44,14 +44,45 @@ function PBLLogo({ className = "w-20 h-20" }) {
   );
 }
 
+// --- SCHEDULE STRENGTH (SoS) CALCULATION HELPER ---
+const calculateScheduleStrength = (playerId, rosterData, historyData) => {
+  const opponentIds = new Set();
+
+  historyData.forEach(match => {
+    const isTeamA = match.teamAPlayerIds.includes(playerId);
+    const isTeamB = match.teamBPlayerIds.includes(playerId);
+
+    if (isTeamA) {
+      match.teamBPlayerIds.forEach(id => opponentIds.add(id));
+    } else if (isTeamB) {
+      match.teamAPlayerIds.forEach(id => opponentIds.add(id));
+    }
+  });
+
+  if (opponentIds.size === 0) return 0;
+
+  let totalOpponentWinRate = 0;
+  let countedOpponents = 0;
+
+  opponentIds.forEach(oppId => {
+    const opp = rosterData.find(p => p.id === oppId);
+    if (opp && opp.gamesPlayed > 0) {
+      totalOpponentWinRate += (opp.wins / opp.gamesPlayed);
+      countedOpponents++;
+    }
+  });
+
+  if (countedOpponents === 0) return 0;
+  return Math.round((totalOpponentWinRate / countedOpponents) * 100);
+};
+
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState('courts'); // 'courts' or 'players'
   const [now, setNow] = useState(Date.now()); // Live clock state for 1-second UI updates
 
-  // Toggle between 'court-independent' (level/tier-based longest wait queue) and 'court-dependent' (assigned court snake draft)
   const [queueMode, setQueueMode] = useState(() => {
-    return localStorage.getItem('pickleq_queue_mode') || 'independent'; // 'independent' or 'dependent'
+    return localStorage.getItem('pickleq_queue_mode') || 'independent';
   });
 
   const [totalCourtCount, setTotalCourtCount] = useState(() => {
@@ -66,11 +97,9 @@ export default function App() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importTextContent, setImportTextContent] = useState('');
 
-  // State to handle inline editing of court names
   const [editingCourtId, setEditingCourtId] = useState(null);
   const [tempCourtName, setTempCourtName] = useState('');
 
-  // Fixed Partnering selections
   const [partnerP1, setPartnerP1] = useState('');
   const [partnerP2, setPartnerP2] = useState('');
 
@@ -89,7 +118,6 @@ export default function App() {
     }));
   });
 
-  // Roster combining tracking fields for both modes
   const [roster, setRoster] = useState(() => {
     const saved = localStorage.getItem('pickleq_roster');
     if (saved) return JSON.parse(saved);
@@ -103,7 +131,6 @@ export default function App() {
     ];
   });
 
-  // Match History log state
   const [matchHistory, setMatchHistory] = useState(() => {
     const saved = localStorage.getItem('pickleq_match_history');
     if (saved) return JSON.parse(saved);
@@ -131,16 +158,15 @@ export default function App() {
       return 0;
     };
 
-    // Filter out players who have never been checked in at all (isCheckedIn is false and gamesPlayed is 0)
     const eligibleRoster = roster.filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
 
     const sorted = [...eligibleRoster].sort((a, b) => {
-      // 1. Level / Tier: Higher level ranks higher
+      // 1. Level / Tier
       if (b.level !== a.level) {
         return b.level - a.level;
       }
 
-      // 2. Win Percentage: Tie-breaker for identical levels
+      // 2. Win Percentage
       const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
       const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
       if (winRateA !== winRateB) {
@@ -160,7 +186,7 @@ export default function App() {
         return h2h;
       }
 
-      return 0; // 5. Exact Same Record (handled by standard competition rank assignment below)
+      return 0;
     });
 
     let currentRank = 1;
@@ -184,7 +210,6 @@ export default function App() {
     });
   }, [roster]);
 
-  // Players currently active on any court match
   const activeCourtPlayerIds = new Set(
     courts.flatMap((c) => [...c.teamA, ...c.teamB].map((p) => p.id))
   );
@@ -193,7 +218,6 @@ export default function App() {
     (p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id)
   );
 
-  // LocalStorage Persistence
   useEffect(() => localStorage.setItem('pickleq_queue_mode', queueMode), [queueMode]);
   useEffect(() => localStorage.setItem('pickleq_court_count', totalCourtCount.toString()), [totalCourtCount]);
   useEffect(() => localStorage.setItem('pickleq_session_active', JSON.stringify(sessionActive)), [sessionActive]);
@@ -202,7 +226,6 @@ export default function App() {
   useEffect(() => localStorage.setItem('pickleq_matches', totalMatches.toString()), [totalMatches]);
   useEffect(() => localStorage.setItem('pickleq_match_history', JSON.stringify(matchHistory)), [matchHistory]);
 
-  // Live 1-second ticker for court timers and waiting times
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -242,7 +265,6 @@ export default function App() {
     setTempCourtName('');
   };
 
-  // FIXED PARTNER HANDLERS
   const handleLinkPartners = (e) => {
     e.preventDefault();
     if (!partnerP1 || !partnerP2 || partnerP1 === partnerP2) {
@@ -272,7 +294,6 @@ export default function App() {
     );
   };
 
-  // SESSION HANDLERS
   const handleToggleSession = () => {
     if (!sessionActive) {
       setSessionActive(true);
@@ -398,7 +419,6 @@ export default function App() {
     setRoster((prev) => prev.filter((p) => p.id !== playerId));
   };
 
-  // --- DEPENDENT QUEUE INITIALIZATION (Snake Draft) ---
   const initializeSnakeDraftAcrossCourts = () => {
     const availableQueuePlayers = roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.gamesPlayed === 0 && (!p.assignedCourt || p.assignedCourt > totalCourtCount))
@@ -484,7 +504,6 @@ export default function App() {
       .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
   };
 
-  // --- INDEPENDENT LEVEL-BASED QUEUE HELPERS ---
   const getQueueForLevelIndependent = (levelNum) => {
     return roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
@@ -569,7 +588,6 @@ export default function App() {
     return candidateMatches;
   };
 
-  // --- MATCH GENERATION & FINISHING ---
   const generateMatchForCourt = (courtId) => {
     if (!sessionActive) {
       alert("Please click 'Start Session' first!");
@@ -704,7 +722,7 @@ export default function App() {
         });
 
         setRoster((prevRoster) => {
-          return prevRoster.map((player) => {
+          const intermediateRoster = prevRoster.map((player) => {
             if (updatedPlayerMap.has(player.id)) {
               const data = updatedPlayerMap.get(player.id);
               return {
@@ -720,10 +738,9 @@ export default function App() {
             }
             return player;
           });
-        });
 
-        setRoster((prevRoster) => {
-          return prevRoster.map(player => {
+          // Second pass for head-to-head tracking and schedule strength
+          const finalRoster = intermediateRoster.map(player => {
             let updatedH2H = { ...(player.headToHead || {}) };
             winners.forEach(w => {
               losers.forEach(l => {
@@ -740,6 +757,11 @@ export default function App() {
             });
             return { ...player, headToHead: updatedH2H };
           });
+
+          return finalRoster.map(player => ({
+            ...player,
+            scheduleStrength: calculateScheduleStrength(player.id, finalRoster, matchHistory)
+          }));
         });
 
       } else {
@@ -757,8 +779,8 @@ export default function App() {
           updatedPlayerMap.set(p.id, { isWinner: false, nextCourt: getNextCourt(false) });
         });
 
-        setRoster((prevRoster) =>
-          prevRoster.map((player) => {
+        setRoster((prevRoster) => {
+          const intermediateRoster = prevRoster.map((player) => {
             if (updatedPlayerMap.has(player.id)) {
               const { isWinner, nextCourt } = updatedPlayerMap.get(player.id);
               const currentCourtGames = player.courtGames || {};
@@ -777,8 +799,13 @@ export default function App() {
               };
             }
             return player;
-          })
-        );
+          });
+
+          return intermediateRoster.map(player => ({
+            ...player,
+            scheduleStrength: calculateScheduleStrength(player.id, intermediateRoster, matchHistory)
+          }));
+        });
       }
 
       const newMatchRecord = {
@@ -822,7 +849,7 @@ export default function App() {
     const matchCourtId = targetMatch.courtId;
 
     setRoster(prevRoster => {
-      return prevRoster.map(player => {
+      const intermediateRoster = prevRoster.map(player => {
         const isTeamA = targetMatch.teamAPlayerIds.includes(player.id);
         const isTeamB = targetMatch.teamBPlayerIds.includes(player.id);
 
@@ -871,6 +898,13 @@ export default function App() {
           assignedCourt: updatedAssignedCourt
         };
       });
+
+      const updatedHistory = matchHistory.map(m => (m.id === matchRecordId ? { ...m, winningTeam: newWinningTeam } : m));
+
+      return intermediateRoster.map(player => ({
+        ...player,
+        scheduleStrength: calculateScheduleStrength(player.id, intermediateRoster, updatedHistory)
+      }));
     });
 
     setMatchHistory(prev =>
@@ -1150,7 +1184,6 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4 flex-wrap w-full md:w-auto justify-between md:justify-start">
-          {/* QUEUE MODE SELECTOR */}
           <div className="flex items-center gap-2">
             <GitBranch className="w-4 h-4 text-cyan-600" />
             <label className="text-sm font-semibold text-gray-900">Queue Match Type:</label>
@@ -1577,10 +1610,9 @@ export default function App() {
           </section>
         )}
 
-        {/* RESTRUCTURED NEXT ROW: LEADERBOARD & MATCH HISTORY SIDE-BY-SIDE */}
+        {/* LEADERBOARD & MATCH HISTORY */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-6 border-t border-gray-200">
           
-          {/* LEADERBOARD SECTION */}
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
               <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
@@ -1603,12 +1635,13 @@ export default function App() {
                       <th className="py-3 px-3 text-center text-emerald-600">W</th>
                       <th className="py-3 px-3 text-center text-rose-600">L</th>
                       <th className="py-3 px-3 text-center text-amber-600">Win%</th>
+                      <th className="py-3 px-3 text-center text-purple-600">SoS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {rankedRoster.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="py-8 text-center text-gray-400 italic">No checked-in players to rank.</td>
+                        <td colSpan="8" className="py-8 text-center text-gray-400 italic">No checked-in players to rank.</td>
                       </tr>
                     ) : (
                       rankedRoster.map((player) => {
@@ -1631,6 +1664,7 @@ export default function App() {
                             <td className="py-3 px-3 text-center font-bold text-emerald-600">{player.wins}</td>
                             <td className="py-3 px-3 text-center font-bold text-rose-600">{player.losses}</td>
                             <td className="py-3 px-3 text-center font-semibold text-amber-600">{winRate}%</td>
+                            <td className="py-3 px-3 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}</td>
                           </tr>
                         );
                       })
@@ -1641,7 +1675,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* MATCH HISTORY SECTION */}
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
               <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
