@@ -27,7 +27,8 @@ import {
   Check,
   Layers,
   GitBranch,
-  History
+  History,
+  Repeat
 } from 'lucide-react';
 
 // Custom Logo Component using src/assets/logo.jfif
@@ -102,7 +103,7 @@ export default function App() {
     ];
   });
 
-  // NEW: Match History log state
+  // Match History log state
   const [matchHistory, setMatchHistory] = useState(() => {
     const saved = localStorage.getItem('pickleq_match_history');
     if (saved) return JSON.parse(saved);
@@ -718,8 +719,11 @@ export default function App() {
       const newMatchRecord = {
         id: Date.now().toString(),
         matchNumber: totalMatches + 1,
+        courtId: currentCourt.id,
         courtName: currentCourt.name,
         level: currentCourt.level,
+        teamAPlayerIds: currentCourt.teamA.map(p => p.id),
+        teamBPlayerIds: currentCourt.teamB.map(p => p.id),
         teamA: currentCourt.teamA.map(p => p.name),
         teamB: currentCourt.teamB.map(p => p.name),
         winningTeam: winningTeamKey,
@@ -742,6 +746,85 @@ export default function App() {
       setTotalMatches((prev) => prev + 1);
       return newCourts;
     });
+  };
+
+  // NEW: Handler to swap the winner of a completed match from the history log
+  const handleSwapMatchWinner = (matchRecordId) => {
+    const targetMatch = matchHistory.find(m => m.id === matchRecordId);
+    if (!targetMatch) return;
+
+    const newWinningTeam = targetMatch.winningTeam === 'A' ? 'B' : 'A';
+
+    setRoster(prevRoster => {
+      return prevRoster.map(player => {
+        const isTeamA = targetMatch.teamAPlayerIds.includes(player.id);
+        const isTeamB = targetMatch.teamBPlayerIds.includes(player.id);
+
+        if (!isTeamA && !isTeamB) return player;
+
+        // Determine if player was originally a winner/loser and is now becoming the opposite
+        const wasWinner = (targetMatch.winningTeam === 'A' && isTeamA) || (targetMatch.winningTeam === 'B' && isTeamB);
+        const isNowWinner = !wasWinner;
+
+        let updatedWins = player.wins;
+        let updatedLosses = player.losses;
+        let updatedLevel = player.level;
+        let updatedAssignedCourt = player.assignedCourt;
+
+        if (wasWinner && !isNowWinner) {
+          // Was winner, now loser
+          updatedWins = Math.max(0, player.wins - 1);
+          updatedLosses = player.losses + 1;
+          if (queueMode === 'independent') {
+            // Reverse level gain (go back down)
+            const prevLevel = targetMatch.level;
+            const simulatedPreMatchLevel = prevLevel < totalCourtCount ? prevLevel - 1 : Math.max(1, prevLevel - 1);
+            updatedLevel = simulatedPreMatchLevel;
+          } else {
+            // Reverse court progression
+            const courtId = targetMatch.courtId;
+            const getPrevCourtForLoser = (cId) => {
+              if (cId === 1) return 2;
+              if (cId === totalCourtCount) return cId;
+              return cId + 1;
+            };
+            updatedAssignedCourt = getPrevCourtForLoser(courtId);
+          }
+        } else if (!wasWinner && isNowWinner) {
+          // Was loser, now winner
+          updatedWins = player.wins + 1;
+          updatedLosses = Math.max(0, player.losses - 1);
+          if (queueMode === 'independent') {
+            // Reverse level loss (go back up)
+            const prevLevel = targetMatch.level;
+            const simulatedPreMatchLevel = prevLevel > 1 ? prevLevel + 1 : Math.min(totalCourtCount, prevLevel + 1);
+            updatedLevel = simulatedPreMatchLevel;
+          } else {
+            // Reverse court progression
+            const courtId = targetMatch.courtId;
+            const getPrevCourtForWinner = (cId) => {
+              if (cId === 1) return 1;
+              if (cId === totalCourtCount) return cId - 1;
+              return cId - 1;
+            };
+            updatedAssignedCourt = getPrevCourtForWinner(courtId);
+          }
+        }
+
+        return {
+          ...player,
+          wins: updatedWins,
+          losses: updatedLosses,
+          level: updatedLevel,
+          assignedCourt: updatedAssignedCourt
+        };
+      });
+    });
+
+    // Update match history record state
+    setMatchHistory(prev =>
+      prev.map(m => (m.id === matchRecordId ? { ...m, winningTeam: newWinningTeam } : m))
+    );
   };
 
   const handleResetSession = () => {
@@ -1521,7 +1604,7 @@ export default function App() {
                         <th className="py-3 px-4">Court / Level</th>
                         <th className="py-3 px-4">Team A Players</th>
                         <th className="py-3 px-4">Team B Players</th>
-                        <th className="py-3 px-4 text-center">Winner</th>
+                        <th className="py-3 px-4 text-center">Winner / Swap</th>
                         <th className="py-3 px-4 text-right">Duration</th>
                       </tr>
                     </thead>
@@ -1544,11 +1627,20 @@ export default function App() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              match.winningTeam === 'A' ? 'bg-cyan-100 text-cyan-800' : 'bg-rose-100 text-rose-800'
-                            }`}>
-                              Team {match.winningTeam} Won
-                            </span>
+                            <div className="flex items-center justify-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                match.winningTeam === 'A' ? 'bg-cyan-100 text-cyan-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                Team {match.winningTeam} Won
+                              </span>
+                              <button
+                                onClick={() => handleSwapMatchWinner(match.id)}
+                                title="Swap Winner (Inverts Player Queue & Stats)"
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Repeat className="w-3 h-3" /> Swap
+                              </button>
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono text-gray-600">
                             {formatDuration(match.durationSec)}
