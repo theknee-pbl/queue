@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Trophy, 
   Users, 
@@ -46,7 +46,7 @@ function PBLLogo({ className = "w-20 h-20" }) {
 
 export default function App() {
   // --- STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState('courts'); // 'courts', 'players', or 'history'
+  const [activeTab, setActiveTab] = useState('courts'); // 'courts' or 'players'
   const [now, setNow] = useState(Date.now()); // Live clock state for 1-second UI updates
 
   // Toggle between 'court-independent' (level/tier-based longest wait queue) and 'court-dependent' (assigned court snake draft)
@@ -94,12 +94,12 @@ export default function App() {
     const saved = localStorage.getItem('pickleq_roster');
     if (saved) return JSON.parse(saved);
     return [
-      { id: '1', name: 'Alex Rivera', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {} },
-      { id: '2', name: 'Jordan Chen', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {} },
-      { id: '3', name: 'Sam Taylor', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {} },
-      { id: '4', name: 'Morgan Smith', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {} },
-      { id: '5', name: 'Chris Lee', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {} },
-      { id: '6', name: 'Pat Gomez', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {} },
+      { id: '1', name: 'Alex Rivera', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {}, scheduleStrength: 0 },
+      { id: '2', name: 'Jordan Chen', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {}, scheduleStrength: 0 },
+      { id: '3', name: 'Sam Taylor', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {}, scheduleStrength: 0 },
+      { id: '4', name: 'Morgan Smith', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {}, scheduleStrength: 0 },
+      { id: '5', name: 'Chris Lee', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {}, scheduleStrength: 0 },
+      { id: '6', name: 'Pat Gomez', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {}, scheduleStrength: 0 },
     ];
   });
 
@@ -116,6 +116,70 @@ export default function App() {
   });
 
   const fileInputRef = useRef(null);
+
+  // --- COMPREHENSIVE 5-RULE SORTING & RANKING HOOK ---
+  const rankedRoster = useMemo(() => {
+    const getHeadToHeadWinner = (playerA, playerB) => {
+      if (!playerA.headToHead || !playerB.headToHead) return 0;
+      const recordAtoB = playerA.headToHead[playerB.id];
+      const recordBtoA = playerB.headToHead[playerA.id];
+      const winsA = recordAtoB ? recordAtoB.winsAgainst : 0;
+      const winsB = recordBtoA ? recordBtoA.winsAgainst : 0;
+
+      if (winsA > winsB) return -1;
+      if (winsB > winsA) return 1;
+      return 0;
+    };
+
+    const sorted = [...roster].sort((a, b) => {
+      // 1. Level / Tier: Higher level ranks higher
+      if (b.level !== a.level) {
+        return b.level - a.level;
+      }
+
+      // 2. Win Percentage: Tie-breaker for identical levels
+      const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
+      const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
+      if (winRateA !== winRateB) {
+        return winRateB - winRateA;
+      }
+
+      // 3. Schedule Strength (SoS)
+      const sosA = a.scheduleStrength || 0;
+      const sosB = b.scheduleStrength || 0;
+      if (sosA !== sosB) {
+        return sosB - sosA;
+      }
+
+      // 4. Head-to-Head
+      const h2h = getHeadToHeadWinner(a, b);
+      if (h2h !== 0) {
+        return h2h;
+      }
+
+      return 0; // 5. Exact Same Record (handled by standard competition rank assignment below)
+    });
+
+    let currentRank = 1;
+    return sorted.map((player, index, arr) => {
+      if (index > 0) {
+        const prev = arr[index - 1];
+        const prevWinRate = prev.gamesPlayed > 0 ? (prev.wins / prev.gamesPlayed) : 0;
+        const currWinRate = player.gamesPlayed > 0 ? (player.wins / player.gamesPlayed) : 0;
+
+        const isDifferent = 
+          prev.level !== player.level || 
+          prevWinRate !== currWinRate || 
+          (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) ||
+          getHeadToHeadWinner(prev, player) !== 0;
+
+        if (isDifferent) {
+          currentRank = index + 1;
+        }
+      }
+      return { ...player, calculatedRank: currentRank };
+    });
+  }, [roster]);
 
   // Players currently active on any court match
   const activeCourtPlayerIds = new Set(
@@ -238,7 +302,8 @@ export default function App() {
       isCheckedIn: false,
       partnerId: null,
       checkedInAt: null,
-      headToHead: {}
+      headToHead: {},
+      scheduleStrength: 0
     };
 
     setRoster((prev) => [...prev, newPlayer]);
@@ -271,7 +336,8 @@ export default function App() {
         isCheckedIn: false,
         partnerId: null,
         checkedInAt: null,
-        headToHead: {}
+        headToHead: {},
+        scheduleStrength: 0
       });
     });
 
@@ -531,7 +597,6 @@ export default function App() {
         })
       );
     } else {
-      // Court-Dependent Queue Match Generation
       const unplayedCount = checkedInQueue.filter((p) => p.gamesPlayed === 0).length;
       if (unplayedCount > 0) {
         initializeSnakeDraftAcrossCourts();
@@ -654,7 +719,6 @@ export default function App() {
           });
         });
 
-        // Record H2H records
         setRoster((prevRoster) => {
           return prevRoster.map(player => {
             let updatedH2H = { ...(player.headToHead || {}) };
@@ -676,7 +740,6 @@ export default function App() {
         });
 
       } else {
-        // Dependent Queue Ladder Movement Rules
         const getNextCourt = (isWinner) => {
           if (courtId === 1) return isWinner ? 1 : 2;
           if (courtId === totalCourtCount) return isWinner ? courtId - 1 : courtId;
@@ -715,7 +778,6 @@ export default function App() {
         );
       }
 
-      // Record match into matchHistory log
       const newMatchRecord = {
         id: Date.now().toString(),
         matchNumber: totalMatches + 1,
@@ -748,7 +810,6 @@ export default function App() {
     });
   };
 
-  // Fixed Handler to swap the winner of a completed match from the history log
   const handleSwapMatchWinner = (matchRecordId) => {
     const targetMatch = matchHistory.find(m => m.id === matchRecordId);
     if (!targetMatch) return;
@@ -976,7 +1037,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Trophy className="w-7 h-7 text-amber-500" />
               <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
-                Session Final Summary ({queueMode === 'independent' ? 'Level & Win Rate Ranking' : 'Court Breakdown Ranking'})
+                Session Final Summary (Ranked by 5-Rule System)
               </h2>
             </div>
             <p className="text-gray-500 text-xs mt-1">
@@ -991,87 +1052,57 @@ export default function App() {
                   <th className="py-3.5 px-4">Rank</th>
                   <th className="py-3.5 px-4">Player Name</th>
                   <th className="py-3.5 px-4 text-center">Fixed Partner</th>
-                  <th className="py-3.5 px-4 text-center">{queueMode === 'independent' ? 'Final Level' : 'Final Tier'}</th>
+                  <th className="py-3.5 px-4 text-center">Level</th>
                   <th className="py-3.5 px-4 text-center text-cyan-600">Games Played</th>
                   <th className="py-3.5 px-4 text-center text-emerald-600">Wins</th>
                   <th className="py-3.5 px-4 text-center text-rose-600">Losses</th>
                   <th className="py-3.5 px-4 text-center text-amber-600">Win Rate %</th>
+                  <th className="py-3.5 px-4 text-center text-purple-600">Schedule Strength (SoS)</th>
                   <th className="py-3.5 px-4 text-right">Total Play Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {roster.length === 0 ? (
+                {rankedRoster.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="py-6 text-center text-gray-400 italic">No players recorded in this session.</td>
+                    <td colSpan="10" className="py-6 text-center text-gray-400 italic">No players recorded in this session.</td>
                   </tr>
                 ) : (
-                  [...roster]
-                    .sort((a, b) => {
-                      if (b.level !== a.level) {
-                        return b.level - a.level;
-                      }
-                      const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
-                      const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
-                      if (winRateA !== winRateB) {
-                        return winRateB - winRateA;
-                      }
-                      const getSoS = (player) => {
-                        const opponents = Object.keys(player.headToHead || {});
-                        if (opponents.length === 0) return 0;
-                        const totalOpponentWins = opponents.reduce((sum, oppId) => {
-                          const oppData = roster.find(r => r.id === oppId);
-                          return sum + (oppData ? oppData.wins : 0);
-                        }, 0);
-                        return totalOpponentWins / opponents.length;
-                      };
-                      const sosA = getSoS(a);
-                      const sosB = getSoS(b);
-                      if (sosA !== sosB) {
-                        return sosB - sosA;
-                      }
-                      if (a.headToHead && a.headToHead[b.id]) {
-                        const h2h = a.headToHead[b.id];
-                        const lossesAgainstB = h2h.totalAgainst - h2h.winsAgainst;
-                        if (h2h.winsAgainst > lossesAgainstB) return -1;
-                        if (lossesAgainstB > h2h.winsAgainst) return 1;
-                      }
-                      return 0;
-                    })
-                    .map((player, index) => {
-                      const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
-                      const partnerName = getPartnerName(player.partnerId);
+                  rankedRoster.map((player) => {
+                    const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
+                    const partnerName = getPartnerName(player.partnerId);
 
-                      return (
-                        <tr key={player.id} className="hover:bg-gray-50 transition">
-                          <td className="py-3.5 px-4 font-bold text-gray-900 text-xs">#{index + 1}</td>
-                          <td className="py-3.5 px-4 font-bold text-gray-900">{player.name}</td>
-                          <td className="py-3.5 px-4 text-center">
-                            {partnerName ? (
-                              <span className="text-[11px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-                                <Link className="w-3 h-3" /> {partnerName}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 text-[10px] italic">Solo</span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="inline-block px-2.5 py-1 rounded-md font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200">
-                              {queueMode === 'independent' ? `Level ${player.level}` : `Court 0${player.assignedCourt}`}
+                    return (
+                      <tr key={player.id} className="hover:bg-gray-50 transition">
+                        <td className="py-3.5 px-4 font-bold text-gray-900 text-xs">#{player.calculatedRank}</td>
+                        <td className="py-3.5 px-4 font-bold text-gray-900">{player.name}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          {partnerName ? (
+                            <span className="text-[11px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                              <Link className="w-3 h-3" /> {partnerName}
                             </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center font-bold text-cyan-600 text-sm">{player.gamesPlayed}</td>
-                          <td className="py-3.5 px-4 text-center font-bold text-emerald-600 text-sm">{player.wins}</td>
-                          <td className="py-3.5 px-4 text-center font-bold text-rose-600 text-sm">{player.losses}</td>
-                          <td className="py-3.5 px-4 text-center font-semibold text-amber-600">{winRate}%</td>
-                          <td className="py-3.5 px-4 text-right font-mono text-gray-600">
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-gray-400" />
-                              {formatDuration(player.timePlayedSec)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
+                          ) : (
+                            <span className="text-gray-400 text-[10px] italic">Solo</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="inline-block px-2.5 py-1 rounded-md font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200">
+                            Level {player.level}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-bold text-cyan-600 text-sm">{player.gamesPlayed}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-emerald-600 text-sm">{player.wins}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-rose-600 text-sm">{player.losses}</td>
+                        <td className="py-3.5 px-4 text-center font-semibold text-amber-600">{winRate}%</td>
+                        <td className="py-3.5 px-4 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-gray-600">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-gray-400" />
+                            {formatDuration(player.timePlayedSec)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1096,7 +1127,7 @@ export default function App() {
 
       {/* SETTINGS BAR & TABS */}
       <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xs">
-        <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab('courts')}
             className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
@@ -1112,14 +1143,6 @@ export default function App() {
             }`}
           >
             <Users className="w-4 h-4" /> Players Roster
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'history' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <History className="w-4 h-4" /> Match History ({matchHistory.length})
           </button>
         </div>
 
@@ -1163,7 +1186,6 @@ export default function App() {
         {activeTab === 'courts' && (
           <div className="space-y-8 animate-in fade-in duration-200">
             
-            {/* CONDITIONAL PREVIEW FOR INDEPENDENT MODE */}
             {queueMode === 'independent' && (
               <div className="bg-gray-50 border border-cyan-500/30 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
@@ -1323,7 +1345,6 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* Court-dependent Queue list preview per court */}
                         {queueMode === 'dependent' && (
                           <div className="mt-3 pt-2.5 border-t border-gray-200">
                             <div className="flex justify-between items-center mb-1">
@@ -1345,7 +1366,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* QUEUES DISPLAY PANEL (Visible only in independent mode) */}
               {queueMode === 'independent' && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -1514,7 +1534,7 @@ export default function App() {
                             )}
 
                             <div className="text-[10px] text-gray-500 mt-0.5">
-                              W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | {queueMode === 'independent' ? `Level: ${player.level}` : `Court: ${player.assignedCourt}`}
+                              W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | Level: {player.level}
                               {player.isCheckedIn && !isPlaying && (
                                 <span className="text-cyan-700 font-mono font-bold ml-1">
                                   ({formatWaitTime(player.checkedInAt)})
@@ -1554,93 +1574,141 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB 3: MATCH HISTORY (RESULT PER GAME) */}
-        {activeTab === 'history' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <History className="w-5 h-5 text-cyan-600" /> Match Results History ({matchHistory.length})
+        {/* RESTRUCTURED NEXT ROW: LEADERBOARD & MATCH HISTORY SIDE-BY-SIDE */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-6 border-t border-gray-200">
+          
+          {/* LEADERBOARD SECTION */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
+                <Trophy className="w-5 h-5 text-amber-500" /> Leaderboard
+              </h2>
+              <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-xl">
+                {roster.length} Players
+              </span>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white max-h-[400px] overflow-y-auto">
+                <table className="w-full text-left text-xs text-gray-900">
+                  <thead className="bg-gray-100 text-gray-700 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="py-3 px-3">Rank</th>
+                      <th className="py-3 px-3">Player</th>
+                      <th className="py-3 px-3 text-center">Lvl</th>
+                      <th className="py-3 px-3 text-center text-cyan-600">P</th>
+                      <th className="py-3 px-3 text-center text-emerald-600">W</th>
+                      <th className="py-3 px-3 text-center text-rose-600">L</th>
+                      <th className="py-3 px-3 text-center text-amber-600">Win%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {rankedRoster.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="py-8 text-center text-gray-400 italic">No players in roster.</td>
+                      </tr>
+                    ) : (
+                      rankedRoster.map((player) => {
+                        const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
+                        return (
+                          <tr key={player.id} className="hover:bg-gray-50 transition">
+                            <td className="py-3 px-3 font-bold text-gray-900 flex items-center gap-1">
+                              {player.calculatedRank === 1 && <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-500 inline" />}
+                              #{player.calculatedRank}
+                            </td>
+                            <td className="py-3 px-3 font-bold text-gray-900 truncate max-w-[120px]">
+                              {player.name}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-amber-50 text-amber-700 border border-amber-200">
+                                {player.level}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center font-bold text-cyan-600">{player.gamesPlayed}</td>
+                            <td className="py-3 px-3 text-center font-bold text-emerald-600">{player.wins}</td>
+                            <td className="py-3 px-3 text-center font-bold text-rose-600">{player.losses}</td>
+                            <td className="py-3 px-3 text-center font-semibold text-amber-600">{winRate}%</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* MATCH HISTORY SECTION */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
+                <History className="w-5 h-5 text-cyan-600" /> Match History
               </h2>
               {matchHistory.length > 0 && (
                 <button
                   onClick={() => {
-                    if (window.confirm("Clear all match history records?")) {
-                      setMatchHistory([]);
-                    }
+                    if (window.confirm("Clear match history records?")) setMatchHistory([]);
                   }}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 border border-gray-200 hover:border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                  className="px-2.5 py-1 bg-gray-200 hover:bg-rose-50 text-gray-600 hover:text-rose-600 rounded-lg text-xs font-bold transition cursor-pointer"
                 >
-                  Clear History Log
+                  Clear Log
                 </button>
               )}
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 md:p-6 shadow-2xs">
-              {matchHistory.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <History className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm italic">No completed matches recorded yet.</p>
-                  <p className="text-xs text-gray-400 mt-1">Finish a match from the active courts to view its result here.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-                  <table className="w-full text-left text-xs text-gray-900">
-                    <thead className="bg-gray-100 text-gray-700 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white max-h-[400px] overflow-y-auto">
+                <table className="w-full text-left text-xs text-gray-900">
+                  <thead className="bg-gray-100 text-gray-700 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="py-3 px-3">#</th>
+                      <th className="py-3 px-3">Court</th>
+                      <th className="py-3 px-3">Teams</th>
+                      <th className="py-3 px-3 text-center">Winner / Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {matchHistory.length === 0 ? (
                       <tr>
-                        <th className="py-3 px-4">Match #</th>
-                        <th className="py-3 px-4">Court / Level</th>
-                        <th className="py-3 px-4">Team A Players</th>
-                        <th className="py-3 px-4">Team B Players</th>
-                        <th className="py-3 px-4 text-center">Winner / Swap</th>
-                        <th className="py-3 px-4 text-right">Duration</th>
+                        <td colSpan="4" className="py-8 text-center text-gray-400 italic">No completed matches yet.</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-medium">
-                      {matchHistory.map((match) => (
+                    ) : (
+                      matchHistory.map((match) => (
                         <tr key={match.id} className="hover:bg-gray-50 transition">
-                          <td className="py-3.5 px-4 font-bold text-gray-900">#{match.matchNumber}</td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-3 font-bold text-gray-900">#{match.matchNumber}</td>
+                          <td className="py-3 px-3">
                             <span className="font-bold text-cyan-700">{match.courtName}</span>
-                            <span className="text-[10px] text-gray-500 block">Level {match.level}</span>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className={match.winningTeam === 'A' ? 'font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 inline-block' : 'text-gray-700'}>
-                              {match.teamA.join(' & ')} {match.winningTeam === 'A' && '👑'}
-                            </span>
+                          <td className="py-3 px-3 text-[11px]">
+                            <div><strong className="text-cyan-600">A:</strong> {match.teamA.join(' & ')}</div>
+                            <div><strong className="text-rose-600">B:</strong> {match.teamB.join(' & ')}</div>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className={match.winningTeam === 'B' ? 'font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 inline-block' : 'text-gray-700'}>
-                              {match.teamB.join(' & ')} {match.winningTeam === 'B' && '👑'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 match.winningTeam === 'A' ? 'bg-cyan-100 text-cyan-800' : 'bg-rose-100 text-rose-800'
                               }`}>
                                 Team {match.winningTeam} Won
                               </span>
                               <button
                                 onClick={() => handleSwapMatchWinner(match.id)}
-                                title="Swap Winner (Inverts Player Queue & Stats)"
-                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Swap Winner"
+                                className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold cursor-pointer"
                               >
-                                <Repeat className="w-3 h-3" /> Swap
+                                <Repeat className="w-3 h-3" />
                               </button>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-right font-mono text-gray-600">
-                            {formatDuration(match.durationSec)}
-                          </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        )}
+
+        </div>
 
       </main>
     </div>
