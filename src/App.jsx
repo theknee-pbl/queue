@@ -109,7 +109,7 @@ export default function App() {
     if (saved) return JSON.parse(saved);
     return Array.from({ length: totalCourtCount }, (_, i) => ({
       id: i + 1,
-      name: i === 0 ? `👑 Court 01 (Highest)` : `Court 0${i + 1}`,
+      name: i === 0 ? `👑 Court 01` : `Court 0${i + 1}`,
       teamA: [],
       teamB: [],
       isLive: false,
@@ -265,7 +265,7 @@ export default function App() {
           const newIdx = prevCourts.length + i + 1;
           return {
             id: newIdx,
-            name: newIdx === 1 ? `👑 Court 01 (Highest)` : `Court 0${newIdx}`,
+            name: newIdx === 1 ? `👑 Court 01` : `Court 0${newIdx}`,
             teamA: [],
             teamB: [],
             isLive: false,
@@ -942,7 +942,7 @@ export default function App() {
       setShowSummaryModal(false);
       setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ 
         id: i + 1, 
-        name: i === 0 ? `👑 Court 01 (Highest)` : `Court 0${i + 1}`, 
+        name: i === 0 ? `👑 Court 01` : `Court 0${i + 1}`, 
         teamA: [], 
         teamB: [], 
         isLive: false, 
