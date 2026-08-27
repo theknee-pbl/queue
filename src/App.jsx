@@ -73,6 +73,7 @@ const calculateScheduleStrength = (playerId, rosterData, historyData) => {
   });
 
   if (countedOpponents === 0) return 0;
+  // Returns Schedule Strength as a percentage (0-100)
   return Math.round((totalOpponentWinRate / countedOpponents) * 100);
 };
 
@@ -108,8 +109,7 @@ export default function App() {
     if (saved) return JSON.parse(saved);
     return Array.from({ length: totalCourtCount }, (_, i) => ({
       id: i + 1,
-      name: `Court 0${i + 1}`,
-      level: i + 1,
+      name: i === 0 ? `👑 Court 01 (Highest)` : `Court 0${i + 1}`,
       teamA: [],
       teamB: [],
       isLive: false,
@@ -144,7 +144,7 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
-  // --- COMPREHENSIVE 5-RULE SORTING & RANKING HOOK ---
+  // --- COMPREHENSIVE SORTING & RANKING HOOK ---
   const rankedRoster = useMemo(() => {
     const getHeadToHeadWinner = (playerA, playerB) => {
       if (!playerA.headToHead || !playerB.headToHead) return 0;
@@ -161,32 +161,54 @@ export default function App() {
     const eligibleRoster = roster.filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
 
     const sorted = [...eligibleRoster].sort((a, b) => {
-      // 1. Level / Tier
-      if (b.level !== a.level) {
-        return b.level - a.level;
-      }
+      if (queueMode === 'dependent') {
+        // Court-Dependent Mode: Prioritize players based on their Court / Priority (starting with Court 1 as the highest tier)
+        const courtA = a.assignedCourt || totalCourtCount;
+        const courtB = b.assignedCourt || totalCourtCount;
+        if (courtA !== courtB) {
+          return courtA - courtB;
+        }
 
-      // 2. Win Percentage
-      const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
-      const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
-      if (winRateA !== winRateB) {
-        return winRateB - winRateA;
-      }
+        // Secondary sorting for ties in court-dependent mode
+        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
+        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
+        if (winRateA !== winRateB) return winRateB - winRateA;
 
-      // 3. Schedule Strength (SoS)
-      const sosA = a.scheduleStrength || 0;
-      const sosB = b.scheduleStrength || 0;
-      if (sosA !== sosB) {
-        return sosB - sosA;
-      }
+        const sosA = a.scheduleStrength || 0;
+        const sosB = b.scheduleStrength || 0;
+        if (sosA !== sosB) return sosB - sosA;
 
-      // 4. Head-to-Head
-      const h2h = getHeadToHeadWinner(a, b);
-      if (h2h !== 0) {
-        return h2h;
-      }
+        return getHeadToHeadWinner(a, b);
+      } else {
+        // Court-Independent Mode: Group and rank players primarily by their Level, followed by win percentage, schedule strength (SoS), and head-to-head records
+        
+        // 1. Level
+        if (b.level !== a.level) {
+          return b.level - a.level;
+        }
 
-      return 0;
+        // 2. Win Percentage
+        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
+        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
+        if (winRateA !== winRateB) {
+          return winRateB - winRateA;
+        }
+
+        // 3. Schedule Strength (SoS)
+        const sosA = a.scheduleStrength || 0;
+        const sosB = b.scheduleStrength || 0;
+        if (sosA !== sosB) {
+          return sosB - sosA;
+        }
+
+        // 4. Head-to-Head Records
+        const h2h = getHeadToHeadWinner(a, b);
+        if (h2h !== 0) {
+          return h2h;
+        }
+
+        return 0;
+      }
     });
 
     let currentRank = 1;
@@ -195,12 +217,12 @@ export default function App() {
         const prev = arr[index - 1];
         const prevWinRate = prev.gamesPlayed > 0 ? (prev.wins / prev.gamesPlayed) : 0;
         const currWinRate = player.gamesPlayed > 0 ? (player.wins / player.gamesPlayed) : 0;
+        const prevCourt = prev.assignedCourt || totalCourtCount;
+        const currCourt = player.assignedCourt || totalCourtCount;
 
-        const isDifferent = 
-          prev.level !== player.level || 
-          prevWinRate !== currWinRate || 
-          (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) ||
-          getHeadToHeadWinner(prev, player) !== 0;
+        const isDifferent = queueMode === 'dependent'
+          ? (prevCourt !== currCourt || prevWinRate !== currWinRate || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0)
+          : (prev.level !== player.level || prevWinRate !== currWinRate || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0);
 
         if (isDifferent) {
           currentRank = index + 1;
@@ -208,7 +230,7 @@ export default function App() {
       }
       return { ...player, calculatedRank: currentRank };
     });
-  }, [roster]);
+  }, [roster, queueMode, totalCourtCount]);
 
   const activeCourtPlayerIds = new Set(
     courts.flatMap((c) => [...c.teamA, ...c.teamB].map((p) => p.id))
@@ -239,16 +261,18 @@ export default function App() {
     
     setCourts((prevCourts) => {
       if (count > prevCourts.length) {
-        const added = Array.from({ length: count - prevCourts.length }, (_, i) => ({
-          id: prevCourts.length + i + 1,
-          name: `Court 0${prevCourts.length + i + 1}`,
-          level: prevCourts.length + i + 1,
-          teamA: [],
-          teamB: [],
-          isLive: false,
-          startTime: null,
-          totalPlayTimeSec: 0
-        }));
+        const added = Array.from({ length: count - prevCourts.length }, (_, i) => {
+          const newIdx = prevCourts.length + i + 1;
+          return {
+            id: newIdx,
+            name: newIdx === 1 ? `👑 Court 01 (Highest)` : `Court 0${newIdx}`,
+            teamA: [],
+            teamB: [],
+            isLive: false,
+            startTime: null,
+            totalPlayTimeSec: 0
+          };
+        });
         return [...prevCourts, ...added];
       } else {
         return prevCourts.slice(0, count);
@@ -320,7 +344,7 @@ export default function App() {
       wins: 0,
       losses: 0,
       level: 1, 
-      assignedCourt: totalCourtCount,
+      assignedCourt: 1,
       courtGames: {},
       timePlayedSec: 0,
       isCheckedIn: false,
@@ -354,7 +378,7 @@ export default function App() {
         wins: 0,
         losses: 0,
         level: 1,
-        assignedCourt: totalCourtCount,
+        assignedCourt: 1,
         courtGames: {},
         timePlayedSec: 0,
         isCheckedIn: false,
@@ -427,7 +451,7 @@ export default function App() {
     if (availableQueuePlayers.length === 0) return;
 
     const courtAssignments = Array.from({ length: totalCourtCount }, () => []);
-    let courtIndex = 0; 
+    let courtIndex = 0;
     const processedIds = new Set();
 
     availableQueuePlayers.forEach((player) => {
@@ -739,7 +763,6 @@ export default function App() {
             return player;
           });
 
-          // Second pass for head-to-head tracking and schedule strength
           const finalRoster = intermediateRoster.map(player => {
             let updatedH2H = { ...(player.headToHead || {}) };
             winners.forEach(w => {
@@ -813,7 +836,7 @@ export default function App() {
         matchNumber: totalMatches + 1,
         courtId: currentCourt.id,
         courtName: currentCourt.name,
-        level: currentCourt.level,
+        level: currentCourt.level || 1,
         teamAPlayerIds: currentCourt.teamA.map(p => p.id),
         teamBPlayerIds: currentCourt.teamB.map(p => p.id),
         teamA: currentCourt.teamA.map(p => p.name),
@@ -919,8 +942,7 @@ export default function App() {
       setShowSummaryModal(false);
       setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ 
         id: i + 1, 
-        name: `Court 0${i + 1}`, 
-        level: i + 1,
+        name: i === 0 ? `👑 Court 01 (Highest)` : `Court 0${i + 1}`, 
         teamA: [], 
         teamB: [], 
         isLive: false, 
@@ -955,7 +977,7 @@ export default function App() {
               PBL Queueing
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              {queueMode === 'independent' ? 'Court-Independent Level Queue & Longest-Wait Match Generation' : 'Court-Dependent Snake Draft & Ladder Match System'}
+              {queueMode === 'independent' ? 'Court-Independent Level Queue & Longest-Wait Match Generation' : '👑 Court-Dependent Highest Court Priority & Ladder Match System'}
             </p>
           </div>
         </div>
@@ -1074,7 +1096,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Trophy className="w-7 h-7 text-amber-500" />
               <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
-                Session Final Summary (Ranked by 5-Rule System)
+                Session Final Summary (Ranked System)
               </h2>
             </div>
             <p className="text-gray-500 text-xs mt-1">
@@ -1089,7 +1111,9 @@ export default function App() {
                   <th className="py-3.5 px-4">Rank</th>
                   <th className="py-3.5 px-4">Player Name</th>
                   <th className="py-3.5 px-4 text-center">Fixed Partner</th>
-                  <th className="py-3.5 px-4 text-center">Level</th>
+                  <th className="py-3.5 px-4 text-center">
+                    {queueMode === 'dependent' ? 'Court' : 'Level'}
+                  </th>
                   <th className="py-3.5 px-4 text-center text-cyan-600">Games Played</th>
                   <th className="py-3.5 px-4 text-center text-emerald-600">Wins</th>
                   <th className="py-3.5 px-4 text-center text-rose-600">Losses</th>
@@ -1123,14 +1147,14 @@ export default function App() {
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-block px-2.5 py-1 rounded-md font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200">
-                            Level {player.level}
+                            {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Level ${player.level}`}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-center font-bold text-cyan-600 text-sm">{player.gamesPlayed}</td>
                         <td className="py-3.5 px-4 text-center font-bold text-emerald-600 text-sm">{player.wins}</td>
                         <td className="py-3.5 px-4 text-center font-bold text-rose-600 text-sm">{player.losses}</td>
                         <td className="py-3.5 px-4 text-center font-semibold text-amber-600">{winRate}%</td>
-                        <td className="py-3.5 px-4 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}</td>
+                        <td className="py-3.5 px-4 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}%</td>
                         <td className="py-3.5 px-4 text-right font-mono text-gray-600">
                           <span className="inline-flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5 text-gray-400" />
@@ -1193,7 +1217,7 @@ export default function App() {
               className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
             >
               <option value="independent">Court-Independent (Level / Longest Wait)</option>
-              <option value="dependent">Court-Dependent (Snake Draft & Ladder)</option>
+              <option value="dependent">Court-Dependent (👑 Highest Court Priority & Ladder)</option>
             </select>
           </div>
 
@@ -1279,7 +1303,7 @@ export default function App() {
               {/* ACTIVE COURTS */}
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Active Courts
+                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Active Courts {queueMode === 'dependent' && <span className="text-xs text-amber-600 font-semibold">(👑 Court 01 is Highest Priority)</span>}
                 </h2>
 
                 <div className={`grid grid-cols-1 ${queueMode === 'dependent' ? 'md:grid-cols-2 xl:grid-cols-3' : ''} gap-4`}>
@@ -1289,7 +1313,7 @@ export default function App() {
                     const courtQueue = queueMode === 'dependent' ? getQueueForCourtDependent(court.id) : [];
 
                     return (
-                      <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                      <div key={court.id} className={`bg-gray-50 border rounded-2xl p-4 shadow-2xs flex flex-col justify-between ${court.id === 1 ? 'border-amber-400 ring-1 ring-amber-400/30' : 'border-gray-200'}`}>
                         <div>
                           <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
                             <div className="flex items-center gap-3">
@@ -1308,10 +1332,10 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-2">
-                                    <span className="font-extrabold text-base text-gray-900">{court.name}</span>
+                                    <span className="font-extrabold text-base text-gray-900">{court.id === 1 && !court.name.includes('👑') ? `👑 ${court.name}` : court.name}</span>
                                     {queueMode === 'independent' && (
                                       <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">
-                                        Lvl {court.level}
+                                        Level {court.level}
                                       </span>
                                     )}
                                     <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -1384,7 +1408,7 @@ export default function App() {
                         {queueMode === 'dependent' && (
                           <div className="mt-3 pt-2.5 border-t border-gray-200">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="text-[11px] font-bold text-gray-700">Court Queue ({courtQueue.length})</span>
+                              <span className="text-[11px] font-bold text-gray-700">{court.id === 1 ? '👑 ' : ''}Court Queue ({courtQueue.length})</span>
                             </div>
                             <div className="space-y-1 max-h-[100px] overflow-y-auto">
                               {courtQueue.map((p, idx) => (
@@ -1630,7 +1654,9 @@ export default function App() {
                     <tr>
                       <th className="py-3 px-3">Rank</th>
                       <th className="py-3 px-3">Player</th>
-                      <th className="py-3 px-3 text-center">Lvl</th>
+                      <th className="py-3 px-3 text-center">
+                        {queueMode === 'dependent' ? 'Court' : 'Level'}
+                      </th>
                       <th className="py-3 px-3 text-center text-cyan-600">P</th>
                       <th className="py-3 px-3 text-center text-emerald-600">W</th>
                       <th className="py-3 px-3 text-center text-rose-600">L</th>
@@ -1657,14 +1683,14 @@ export default function App() {
                             </td>
                             <td className="py-3 px-3 text-center">
                               <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-amber-50 text-amber-700 border border-amber-200">
-                                {player.level}
+                                {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Level ${player.level}`}
                               </span>
                             </td>
                             <td className="py-3 px-3 text-center font-bold text-cyan-600">{player.gamesPlayed}</td>
                             <td className="py-3 px-3 text-center font-bold text-emerald-600">{player.wins}</td>
                             <td className="py-3 px-3 text-center font-bold text-rose-600">{player.losses}</td>
                             <td className="py-3 px-3 text-center font-semibold text-amber-600">{winRate}%</td>
-                            <td className="py-3 px-3 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}</td>
+                            <td className="py-3 px-3 text-center font-semibold text-purple-600">{player.scheduleStrength || 0}%</td>
                           </tr>
                         );
                       })
