@@ -26,7 +26,8 @@ import {
   Edit2,
   Check,
   Layers,
-  GitBranch
+  GitBranch,
+  History
 } from 'lucide-react';
 
 // Custom Logo Component using src/assets/logo.jfif
@@ -44,10 +45,10 @@ function PBLLogo({ className = "w-20 h-20" }) {
 
 export default function App() {
   // --- STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState('courts'); // 'courts' or 'players'
+  const [activeTab, setActiveTab] = useState('courts'); // 'courts', 'players', or 'history'
   const [now, setNow] = useState(Date.now()); // Live clock state for 1-second UI updates
 
-  // NEW: Toggle between 'court-independent' (level/tier-based longest wait queue) and 'court-dependent' (assigned court snake draft)
+  // Toggle between 'court-independent' (level/tier-based longest wait queue) and 'court-dependent' (assigned court snake draft)
   const [queueMode, setQueueMode] = useState(() => {
     return localStorage.getItem('pickleq_queue_mode') || 'independent'; // 'independent' or 'dependent'
   });
@@ -101,6 +102,13 @@ export default function App() {
     ];
   });
 
+  // NEW: Match History log state
+  const [matchHistory, setMatchHistory] = useState(() => {
+    const saved = localStorage.getItem('pickleq_match_history');
+    if (saved) return JSON.parse(saved);
+    return [];
+  });
+
   const [playerName, setPlayerName] = useState('');
   const [totalMatches, setTotalMatches] = useState(() => {
     return parseInt(localStorage.getItem('pickleq_matches') || '0', 10);
@@ -124,6 +132,7 @@ export default function App() {
   useEffect(() => localStorage.setItem('pickleq_courts', JSON.stringify(courts)), [courts]);
   useEffect(() => localStorage.setItem('pickleq_roster', JSON.stringify(roster)), [roster]);
   useEffect(() => localStorage.setItem('pickleq_matches', totalMatches.toString()), [totalMatches]);
+  useEffect(() => localStorage.setItem('pickleq_match_history', JSON.stringify(matchHistory)), [matchHistory]);
 
   // Live 1-second ticker for court timers and waiting times
   useEffect(() => {
@@ -705,6 +714,21 @@ export default function App() {
         );
       }
 
+      // Record match into matchHistory log
+      const newMatchRecord = {
+        id: Date.now().toString(),
+        matchNumber: totalMatches + 1,
+        courtName: currentCourt.name,
+        level: currentCourt.level,
+        teamA: currentCourt.teamA.map(p => p.name),
+        teamB: currentCourt.teamB.map(p => p.name),
+        winningTeam: winningTeamKey,
+        durationSec,
+        timestamp: Date.now()
+      };
+
+      setMatchHistory((prev) => [newMatchRecord, ...prev]);
+
       let newCourts = [...prevCourts];
       newCourts[courtIndex] = { 
         ...currentCourt, 
@@ -736,6 +760,7 @@ export default function App() {
         totalPlayTimeSec: 0 
       })));
       setRoster([]);
+      setMatchHistory([]);
       setTotalMatches(0);
     }
   };
@@ -912,18 +937,35 @@ export default function App() {
                 ) : (
                   [...roster]
                     .sort((a, b) => {
-                      if (queueMode === 'independent') {
-                        if (b.level !== a.level) return b.level - a.level;
-                        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
-                        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
-                        if (winRateA !== winRateB) return winRateB - winRateA;
-                        return b.wins - a.wins;
-                      } else {
-                        if (a.assignedCourt !== b.assignedCourt) return a.assignedCourt - b.assignedCourt;
-                        const rateA = a.gamesPlayed > 0 ? a.wins / a.gamesPlayed : 0;
-                        const rateB = b.gamesPlayed > 0 ? b.wins / b.gamesPlayed : 0;
-                        return rateB - rateA;
+                      if (b.level !== a.level) {
+                        return b.level - a.level;
                       }
+                      const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
+                      const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
+                      if (winRateA !== winRateB) {
+                        return winRateB - winRateA;
+                      }
+                      const getSoS = (player) => {
+                        const opponents = Object.keys(player.headToHead || {});
+                        if (opponents.length === 0) return 0;
+                        const totalOpponentWins = opponents.reduce((sum, oppId) => {
+                          const oppData = roster.find(r => r.id === oppId);
+                          return sum + (oppData ? oppData.wins : 0);
+                        }, 0);
+                        return totalOpponentWins / opponents.length;
+                      };
+                      const sosA = getSoS(a);
+                      const sosB = getSoS(b);
+                      if (sosA !== sosB) {
+                        return sosB - sosA;
+                      }
+                      if (a.headToHead && a.headToHead[b.id]) {
+                        const h2h = a.headToHead[b.id];
+                        const lossesAgainstB = h2h.totalAgainst - h2h.winsAgainst;
+                        if (h2h.winsAgainst > lossesAgainstB) return -1;
+                        if (lossesAgainstB > h2h.winsAgainst) return 1;
+                      }
+                      return 0;
                     })
                     .map((player, index) => {
                       const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
@@ -987,7 +1029,7 @@ export default function App() {
         <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto">
           <button
             onClick={() => setActiveTab('courts')}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
               activeTab === 'courts' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -995,11 +1037,19 @@ export default function App() {
           </button>
           <button
             onClick={() => setActiveTab('players')}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
               activeTab === 'players' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
             <Users className="w-4 h-4" /> Players Roster
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+              activeTab === 'history' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <History className="w-4 h-4" /> Match History ({matchHistory.length})
           </button>
         </div>
 
@@ -1432,6 +1482,85 @@ export default function App() {
             </div>
 
           </section>
+        )}
+
+        {/* TAB 3: MATCH HISTORY (RESULT PER GAME) */}
+        {activeTab === 'history' && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-cyan-600" /> Match Results History ({matchHistory.length})
+              </h2>
+              {matchHistory.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm("Clear all match history records?")) {
+                      setMatchHistory([]);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 border border-gray-200 hover:border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Clear History Log
+                </button>
+              )}
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 md:p-6 shadow-2xs">
+              {matchHistory.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <History className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm italic">No completed matches recorded yet.</p>
+                  <p className="text-xs text-gray-400 mt-1">Finish a match from the active courts to view its result here.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                  <table className="w-full text-left text-xs text-gray-900">
+                    <thead className="bg-gray-100 text-gray-700 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200">
+                      <tr>
+                        <th className="py-3 px-4">Match #</th>
+                        <th className="py-3 px-4">Court / Level</th>
+                        <th className="py-3 px-4">Team A Players</th>
+                        <th className="py-3 px-4">Team B Players</th>
+                        <th className="py-3 px-4 text-center">Winner</th>
+                        <th className="py-3 px-4 text-right">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-medium">
+                      {matchHistory.map((match) => (
+                        <tr key={match.id} className="hover:bg-gray-50 transition">
+                          <td className="py-3.5 px-4 font-bold text-gray-900">#{match.matchNumber}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-cyan-700">{match.courtName}</span>
+                            <span className="text-[10px] text-gray-500 block">Level {match.level}</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={match.winningTeam === 'A' ? 'font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 inline-block' : 'text-gray-700'}>
+                              {match.teamA.join(' & ')} {match.winningTeam === 'A' && '👑'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={match.winningTeam === 'B' ? 'font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 inline-block' : 'text-gray-700'}>
+                              {match.teamB.join(' & ')} {match.winningTeam === 'B' && '👑'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              match.winningTeam === 'A' ? 'bg-cyan-100 text-cyan-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              Team {match.winningTeam} Won
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono text-gray-600">
+                            {formatDuration(match.durationSec)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
       </main>
