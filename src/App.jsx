@@ -310,6 +310,26 @@ export default function App() {
     );
   };
 
+  // --- QUEUE REARRANGEMENT HELPER ---
+  const handleReorderQueue = (playerId, direction, currentQueue) => {
+    const index = currentQueue.findIndex(p => p.id === playerId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentQueue.length) return;
+
+    const playerA = currentQueue[index];
+    const playerB = currentQueue[targetIndex];
+
+    const timeA = playerA.checkedInAt || Date.now();
+    const timeB = playerB.checkedInAt || Date.now();
+
+    setRoster(prev => prev.map(p => {
+      if (p.id === playerA.id) return { ...p, checkedInAt: timeB };
+      if (p.id === playerB.id) return { ...p, checkedInAt: timeA };
+      return p;
+    }));
+  };
+
   const handleToggleSession = () => {
     if (!sessionActive) {
       setSessionActive(true);
@@ -517,27 +537,13 @@ export default function App() {
         if (player.gamesPlayed === 0) return true;
         return player.assignedCourt === courtId;
       })
-      .sort((a, b) => {
-        const aHasPartnerHere = a.partnerId && checkedInQueue.some(p => p.id === a.partnerId && (p.assignedCourt === courtId || p.gamesPlayed === 0));
-        const bHasPartnerHere = b.partnerId && checkedInQueue.some(p => p.id === b.partnerId && (p.assignedCourt === courtId || p.gamesPlayed === 0));
-        if (aHasPartnerHere && !bHasPartnerHere) return -1;
-        if (!aHasPartnerHere && bHasPartnerHere) return 1;
-
-        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
-      });
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
   };
 
   const getQueueForLevelIndependent = (levelNum) => {
     return roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-      .sort((a, b) => {
-        const aHasPartnerHere = a.partnerId && roster.some(p => p.id === a.partnerId && p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum);
-        const bHasPartnerHere = b.partnerId && roster.some(p => p.id === b.partnerId && p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum);
-        if (aHasPartnerHere && !bHasPartnerHere) return -1;
-        if (!aHasPartnerHere && bHasPartnerHere) return 1;
-
-        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
-      });
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
   };
 
   const formatWaitTime = (checkedInAt) => {
@@ -555,7 +561,6 @@ export default function App() {
     const selected = [];
     const usedIds = new Set();
 
-    // 1. First, select any available complete fixed-partner pair from the queue
     const partnerPair = levelQueue.find(p => p.partnerId && levelQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
     if (partnerPair) {
       const partner = levelQueue.find(p => p.id === partnerPair.partnerId);
@@ -566,11 +571,9 @@ export default function App() {
       }
     }
 
-    // 2. Next, fill remaining slots with solo players (or subsequent pairs if room permits)
     for (const p of levelQueue) {
       if (usedIds.has(p.id)) continue;
       
-      // If this player also has a partner available and we have 2 empty slots, grab them together
       if (p.partnerId) {
         const partner = levelQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
         if (partner && selected.length <= 2) {
@@ -578,7 +581,6 @@ export default function App() {
           usedIds.add(p.id);
           usedIds.add(partner.id);
         } else if (!partner) {
-          // Partner not in queue, treat as solo if we need singles
           selected.push(p);
           usedIds.add(p.id);
         }
@@ -591,11 +593,9 @@ export default function App() {
 
     if (selected.length < 4) return { teamA: [], teamB: [], valid: false };
 
-    // 3. Construct Teams: Ensure fixed partners stay together, and solos pair with solos
     let teamA = [];
     let teamB = [];
 
-    // Check who is paired with who among the selected 4
     const p0 = selected[0];
     const p1 = selected[1];
     const p2 = selected[2];
@@ -605,14 +605,12 @@ export default function App() {
     const isP2P3Partner = p2.partnerId === p3.id;
 
     if (isP0P1Partner) {
-      // Fixed pair (0,1) vs remaining (2,3) [Solos will naturally group together here]
       teamA = [p0, p1];
       teamB = [p2, p3];
     } else if (isP2P3Partner) {
       teamA = [p2, p3];
       teamB = [p0, p1];
     } else {
-      // If there are mixed pairs or all solos: group 0 & 3 vs 1 & 2 (or standard distribution)
       teamA = [p0, p3];
       teamB = [p1, p2];
     }
@@ -696,7 +694,6 @@ export default function App() {
       const selected = [];
       const usedIds = new Set();
 
-      // 1. Select fixed partner pair first
       const partnerPair = courtQueue.find(p => p.partnerId && courtQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
       if (partnerPair) {
         const partner = courtQueue.find(p => p.id === partnerPair.partnerId);
@@ -707,7 +704,6 @@ export default function App() {
         }
       }
 
-      // 2. Fill remaining slots with solos / next players
       for (const p of courtQueue) {
         if (usedIds.has(p.id)) continue;
         if (p.partnerId) {
@@ -739,10 +735,10 @@ export default function App() {
 
       if (p0.partnerId === p1.id) {
         teamA = [p0, p1];
-        teamB = [p2, p3]; // Solos 2 and 3 get paired together against the fixed pair
+        teamB = [p2, p3];
       } else if (p2.partnerId === p3.id) {
         teamA = [p2, p3];
-        teamB = [p0, p1]; // Solos 0 and 1 get paired together against the fixed pair
+        teamB = [p0, p1];
       } else {
         teamA = [p0, p3];
         teamB = [p1, p2];
@@ -1463,11 +1459,34 @@ export default function App() {
                             <div className="flex justify-between items-center mb-1">
                               <span className="text-[11px] font-bold text-gray-700">{court.id === 1 ? '👑 ' : ''}Court Queue ({courtQueue.length})</span>
                             </div>
-                            <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                            <div className="space-y-1 max-h-[120px] overflow-y-auto">
                               {courtQueue.map((p, idx) => (
                                 <div key={p.id} className="flex justify-between items-center px-2 py-1 bg-white border border-gray-200 rounded text-[11px]">
-                                  <span className="font-medium text-gray-800">#{idx + 1} {p.name}</span>
-                                  <span className="text-[9px] text-cyan-600 font-mono">{p.gamesPlayed}G</span>
+                                  <span className="font-medium text-gray-800 truncate flex items-center gap-1">
+                                    #{idx + 1} {p.name} 
+                                    {p.partnerId && <Link className="w-3 h-3 text-cyan-600 shrink-0" title="Has Fixed Partner" />}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-0.5">
+                                      <button 
+                                        onClick={() => handleReorderQueue(p.id, 'up', courtQueue)} 
+                                        disabled={idx === 0} 
+                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1"
+                                        title="Move Up"
+                                      >
+                                        ▲
+                                      </button>
+                                      <button 
+                                        onClick={() => handleReorderQueue(p.id, 'down', courtQueue)} 
+                                        disabled={idx === courtQueue.length - 1} 
+                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1"
+                                        title="Move Down"
+                                      >
+                                        ▼
+                                      </button>
+                                    </div>
+                                    <span className="text-[9px] text-cyan-600 font-mono">{p.gamesPlayed}G</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -1507,13 +1526,34 @@ export default function App() {
                                 <div key={player.id} className="flex justify-between items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs">
                                   <div className="flex items-center gap-2 truncate">
                                     <span className="font-bold text-gray-400">#{idx + 1}</span>
-                                    <span className="font-bold text-gray-800 truncate">
-                                      {player.name} {player.partnerId && <Link className="w-3 h-3 inline text-amber-500 ml-1" />}
+                                    <span className="font-bold text-gray-800 truncate flex items-center gap-1">
+                                      {player.name} 
+                                      {player.partnerId && <Link className="w-3 h-3 text-amber-500 shrink-0" title="Has Fixed Partner" />}
                                     </span>
                                   </div>
-                                  <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded px-1">
+                                      <button 
+                                        onClick={() => handleReorderQueue(player.id, 'up', levelQueue)} 
+                                        disabled={idx === 0} 
+                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
+                                        title="Move Up"
+                                      >
+                                        ▲
+                                      </button>
+                                      <button 
+                                        onClick={() => handleReorderQueue(player.id, 'down', levelQueue)} 
+                                        disabled={idx === levelQueue.length - 1} 
+                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
+                                        title="Move Down"
+                                      >
+                                        ▼
+                                      </button>
+                                    </div>
+                                    <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
+                                    </span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
