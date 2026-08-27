@@ -748,12 +748,14 @@ export default function App() {
     });
   };
 
-  // NEW: Handler to swap the winner of a completed match from the history log
+  // Fixed Handler to swap the winner of a completed match from the history log
   const handleSwapMatchWinner = (matchRecordId) => {
     const targetMatch = matchHistory.find(m => m.id === matchRecordId);
     if (!targetMatch) return;
 
     const newWinningTeam = targetMatch.winningTeam === 'A' ? 'B' : 'A';
+    const matchLevel = targetMatch.level;
+    const matchCourtId = targetMatch.courtId;
 
     setRoster(prevRoster => {
       return prevRoster.map(player => {
@@ -762,52 +764,38 @@ export default function App() {
 
         if (!isTeamA && !isTeamB) return player;
 
-        // Determine if player was originally a winner/loser and is now becoming the opposite
-        const wasWinner = (targetMatch.winningTeam === 'A' && isTeamA) || (targetMatch.winningTeam === 'B' && isTeamB);
-        const isNowWinner = !wasWinner;
+        const wasWinner = (isTeamA && targetMatch.winningTeam === 'A') || (isTeamB && targetMatch.winningTeam === 'B');
+        const isNowWinner = (isTeamA && newWinningTeam === 'A') || (isTeamB && newWinningTeam === 'B');
 
         let updatedWins = player.wins;
         let updatedLosses = player.losses;
+
+        if (wasWinner && !isNowWinner) {
+          updatedWins = Math.max(0, player.wins - 1);
+          updatedLosses = player.losses + 1;
+        } else if (!wasWinner && isNowWinner) {
+          updatedWins = player.wins + 1;
+          updatedLosses = Math.max(0, player.losses - 1);
+        }
+
         let updatedLevel = player.level;
         let updatedAssignedCourt = player.assignedCourt;
 
-        if (wasWinner && !isNowWinner) {
-          // Was winner, now loser
-          updatedWins = Math.max(0, player.wins - 1);
-          updatedLosses = player.losses + 1;
-          if (queueMode === 'independent') {
-            // Reverse level gain (go back down)
-            const prevLevel = targetMatch.level;
-            const simulatedPreMatchLevel = prevLevel < totalCourtCount ? prevLevel - 1 : Math.max(1, prevLevel - 1);
-            updatedLevel = simulatedPreMatchLevel;
+        if (queueMode === 'independent') {
+          if (isNowWinner) {
+            updatedLevel = matchLevel < totalCourtCount ? matchLevel + 1 : matchLevel;
           } else {
-            // Reverse court progression
-            const courtId = targetMatch.courtId;
-            const getPrevCourtForLoser = (cId) => {
-              if (cId === 1) return 2;
-              if (cId === totalCourtCount) return cId;
-              return cId + 1;
-            };
-            updatedAssignedCourt = getPrevCourtForLoser(courtId);
+            updatedLevel = matchLevel > 1 ? matchLevel - 1 : 1;
           }
-        } else if (!wasWinner && isNowWinner) {
-          // Was loser, now winner
-          updatedWins = player.wins + 1;
-          updatedLosses = Math.max(0, player.losses - 1);
-          if (queueMode === 'independent') {
-            // Reverse level loss (go back up)
-            const prevLevel = targetMatch.level;
-            const simulatedPreMatchLevel = prevLevel > 1 ? prevLevel + 1 : Math.min(totalCourtCount, prevLevel + 1);
-            updatedLevel = simulatedPreMatchLevel;
+        } else {
+          if (isNowWinner) {
+            if (matchCourtId === 1) updatedAssignedCourt = 1;
+            else if (matchCourtId === totalCourtCount) updatedAssignedCourt = matchCourtId - 1;
+            else updatedAssignedCourt = matchCourtId - 1;
           } else {
-            // Reverse court progression
-            const courtId = targetMatch.courtId;
-            const getPrevCourtForWinner = (cId) => {
-              if (cId === 1) return 1;
-              if (cId === totalCourtCount) return cId - 1;
-              return cId - 1;
-            };
-            updatedAssignedCourt = getPrevCourtForWinner(courtId);
+            if (matchCourtId === 1) updatedAssignedCourt = 2;
+            else if (matchCourtId === totalCourtCount) updatedAssignedCourt = matchCourtId;
+            else updatedAssignedCourt = matchCourtId + 1;
           }
         }
 
@@ -821,7 +809,6 @@ export default function App() {
       });
     });
 
-    // Update match history record state
     setMatchHistory(prev =>
       prev.map(m => (m.id === matchRecordId ? { ...m, winningTeam: newWinningTeam } : m))
     );
