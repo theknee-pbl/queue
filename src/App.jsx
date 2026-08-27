@@ -162,14 +162,12 @@ export default function App() {
 
     const sorted = [...eligibleRoster].sort((a, b) => {
       if (queueMode === 'dependent') {
-        // Court-Dependent Mode: Prioritize players based on their Court / Priority (starting with Court 1 as the highest tier)
         const courtA = a.assignedCourt || totalCourtCount;
         const courtB = b.assignedCourt || totalCourtCount;
         if (courtA !== courtB) {
           return courtA - courtB;
         }
 
-        // Secondary sorting for ties in court-dependent mode
         const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
         const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
         if (winRateA !== winRateB) return winRateB - winRateA;
@@ -180,28 +178,22 @@ export default function App() {
 
         return getHeadToHeadWinner(a, b);
       } else {
-        // Court-Independent Mode: Group and rank players primarily by their Level, followed by win percentage, schedule strength (SoS), and head-to-head records
-        
-        // 1. Level
         if (b.level !== a.level) {
           return b.level - a.level;
         }
 
-        // 2. Win Percentage
         const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
         const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
         if (winRateA !== winRateB) {
           return winRateB - winRateA;
         }
 
-        // 3. Schedule Strength (SoS)
         const sosA = a.scheduleStrength || 0;
         const sosB = b.scheduleStrength || 0;
         if (sosA !== sosB) {
           return sosB - sosA;
         }
 
-        // 4. Head-to-Head Records
         const h2h = getHeadToHeadWinner(a, b);
         if (h2h !== 0) {
           return h2h;
@@ -525,13 +517,27 @@ export default function App() {
         if (player.gamesPlayed === 0) return true;
         return player.assignedCourt === courtId;
       })
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
+      .sort((a, b) => {
+        const aHasPartnerHere = a.partnerId && checkedInQueue.some(p => p.id === a.partnerId && (p.assignedCourt === courtId || p.gamesPlayed === 0));
+        const bHasPartnerHere = b.partnerId && checkedInQueue.some(p => p.id === b.partnerId && (p.assignedCourt === courtId || p.gamesPlayed === 0));
+        if (aHasPartnerHere && !bHasPartnerHere) return -1;
+        if (!aHasPartnerHere && bHasPartnerHere) return 1;
+
+        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
+      });
   };
 
   const getQueueForLevelIndependent = (levelNum) => {
     return roster
       .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
+      .sort((a, b) => {
+        const aHasPartnerHere = a.partnerId && roster.some(p => p.id === a.partnerId && p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum);
+        const bHasPartnerHere = b.partnerId && roster.some(p => p.id === b.partnerId && p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum);
+        if (aHasPartnerHere && !bHasPartnerHere) return -1;
+        if (!aHasPartnerHere && bHasPartnerHere) return 1;
+
+        return (a.checkedInAt || 0) - (b.checkedInAt || 0);
+      });
   };
 
   const formatWaitTime = (checkedInAt) => {
@@ -549,8 +555,22 @@ export default function App() {
     const selected = [];
     const usedIds = new Set();
 
+    // 1. First, select any available complete fixed-partner pair from the queue
+    const partnerPair = levelQueue.find(p => p.partnerId && levelQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
+    if (partnerPair) {
+      const partner = levelQueue.find(p => p.id === partnerPair.partnerId);
+      if (partner) {
+        selected.push(partnerPair, partner);
+        usedIds.add(partnerPair.id);
+        usedIds.add(partner.id);
+      }
+    }
+
+    // 2. Next, fill remaining slots with solo players (or subsequent pairs if room permits)
     for (const p of levelQueue) {
       if (usedIds.has(p.id)) continue;
+      
+      // If this player also has a partner available and we have 2 empty slots, grab them together
       if (p.partnerId) {
         const partner = levelQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
         if (partner && selected.length <= 2) {
@@ -558,7 +578,9 @@ export default function App() {
           usedIds.add(p.id);
           usedIds.add(partner.id);
         } else if (!partner) {
-          continue;
+          // Partner not in queue, treat as solo if we need singles
+          selected.push(p);
+          usedIds.add(p.id);
         }
       } else {
         selected.push(p);
@@ -569,17 +591,30 @@ export default function App() {
 
     if (selected.length < 4) return { teamA: [], teamB: [], valid: false };
 
+    // 3. Construct Teams: Ensure fixed partners stay together, and solos pair with solos
     let teamA = [];
     let teamB = [];
-    if (selected[0].partnerId === selected[1].id) {
-      teamA = [selected[0], selected[1]];
-      teamB = [selected[2], selected[3]];
-    } else if (selected[2].partnerId === selected[3].id) {
-      teamA = [selected[2], selected[3]];
-      teamB = [selected[0], selected[1]];
+
+    // Check who is paired with who among the selected 4
+    const p0 = selected[0];
+    const p1 = selected[1];
+    const p2 = selected[2];
+    const p3 = selected[3];
+
+    const isP0P1Partner = p0.partnerId === p1.id;
+    const isP2P3Partner = p2.partnerId === p3.id;
+
+    if (isP0P1Partner) {
+      // Fixed pair (0,1) vs remaining (2,3) [Solos will naturally group together here]
+      teamA = [p0, p1];
+      teamB = [p2, p3];
+    } else if (isP2P3Partner) {
+      teamA = [p2, p3];
+      teamB = [p0, p1];
     } else {
-      teamA = [selected[0], selected[3]];
-      teamB = [selected[1], selected[2]];
+      // If there are mixed pairs or all solos: group 0 & 3 vs 1 & 2 (or standard distribution)
+      teamA = [p0, p3];
+      teamB = [p1, p2];
     }
 
     return { teamA, teamB, valid: true, level: levelNum };
@@ -621,7 +656,7 @@ export default function App() {
     if (queueMode === 'independent') {
       const candidateMatches = getPrioritizedCandidateMatchesIndependent();
       if (candidateMatches.length === 0) {
-        alert(`No level queue currently has at least 4 checked-in players of the same level ready to play.`);
+        alert(`No level queue currently has at least 4 checked-in players ready to play.`);
         return;
       }
 
@@ -661,6 +696,18 @@ export default function App() {
       const selected = [];
       const usedIds = new Set();
 
+      // 1. Select fixed partner pair first
+      const partnerPair = courtQueue.find(p => p.partnerId && courtQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
+      if (partnerPair) {
+        const partner = courtQueue.find(p => p.id === partnerPair.partnerId);
+        if (partner) {
+          selected.push(partnerPair, partner);
+          usedIds.add(partnerPair.id);
+          usedIds.add(partner.id);
+        }
+      }
+
+      // 2. Fill remaining slots with solos / next players
       for (const p of courtQueue) {
         if (usedIds.has(p.id)) continue;
         if (p.partnerId) {
@@ -670,7 +717,8 @@ export default function App() {
             usedIds.add(p.id);
             usedIds.add(partner.id);
           } else if (!partner) {
-            continue;
+            selected.push(p);
+            usedIds.add(p.id);
           }
         } else {
           selected.push(p);
@@ -680,19 +728,24 @@ export default function App() {
       }
 
       if (selected.length < 4) {
-        alert("Could not pair available players evenly with active fixed partners.");
+        alert("Could not pair available players evenly.");
         return;
       }
 
-      if (selected[0].partnerId === selected[1].id) {
-        teamA = [selected[0], selected[1]];
-        teamB = [selected[2], selected[3]];
-      } else if (selected[2].partnerId === selected[3].id) {
-        teamA = [selected[2], selected[3]];
-        teamB = [selected[0], selected[1]];
+      const p0 = selected[0];
+      const p1 = selected[1];
+      const p2 = selected[2];
+      const p3 = selected[3];
+
+      if (p0.partnerId === p1.id) {
+        teamA = [p0, p1];
+        teamB = [p2, p3]; // Solos 2 and 3 get paired together against the fixed pair
+      } else if (p2.partnerId === p3.id) {
+        teamA = [p2, p3];
+        teamB = [p0, p1]; // Solos 0 and 1 get paired together against the fixed pair
       } else {
-        teamA = [selected[0], selected[3]];
-        teamB = [selected[1], selected[2]];
+        teamA = [p0, p3];
+        teamB = [p1, p2];
       }
 
       setCourts((prev) =>
