@@ -1728,9 +1728,10 @@ export default function App() {
         )}
 
         {/* LEADERBOARD & MATCH HISTORY */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-6 border-t border-gray-200">
+        <div className="flex flex-col gap-8 pt-6 border-t border-gray-200">
           
-          <div className="space-y-4">
+          {/* ROW 1: FULL-WIDTH LEADERBOARD */}
+          <div className="w-full space-y-4">
             <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
               <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
                 <Trophy className="w-5 h-5 text-amber-500" /> Leaderboard
@@ -1794,7 +1795,8 @@ export default function App() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          {/* ROW 2: FULL-WIDTH MATCH HISTORY */}
+          <div className="w-full space-y-4">
             <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
               <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
                 <History className="w-5 h-5 text-cyan-600" /> Match History
