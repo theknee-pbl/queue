@@ -1390,7 +1390,6 @@ export default function App() {
                         {/* Col 3: Raw Win % */}
                         <div className="space-y-1.5 md:col-span-1">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-500 font-medium">Raw Win %</span>
                             <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
                           </div>
                           <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
@@ -2132,7 +2131,6 @@ export default function App() {
                             {/* Col 3: Raw Win % */}
                             <div className="space-y-1.5 md:col-span-1">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-500 font-medium">Raw Win %</span>
                                 <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
                               </div>
                               <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
