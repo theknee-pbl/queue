@@ -8,7 +8,6 @@ import {
   RotateCcw, 
   Flame,
   Crown,
-  Settings,
   Sparkles,
   UserCheck,
   UserX,
@@ -1444,48 +1443,29 @@ export default function App() {
         </section>
       )}
 
-      {/* UPDATE 3: SEPERATED QUEUE MATCH TYPE & COURTS, PLACED ABOVE */}
-      <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xs">
-        <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('courts')}
-            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'courts' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" /> Courts & Queues
-          </button>
-          <button
-            onClick={() => setActiveTab('players')}
-            className={`flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'players' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Users className="w-4 h-4" /> Players Roster
-          </button>
-        </div>
-
-        <div className="flex items-center gap-6 flex-wrap w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-cyan-600" />
-            <label className="text-sm font-semibold text-gray-900">Queue Match Type:</label>
+      {/* SEPARATED SYSTEM SETTINGS (Queue Match Type & Courts) */}
+      <div className="max-w-7xl mx-auto mb-4 bg-white border border-gray-200 rounded-2xl p-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-2xs">
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-1.5">
+            <GitBranch className="w-3.5 h-3.5 text-cyan-600" />
+            <label className="text-xs font-semibold text-gray-900">Match Mode:</label>
             <select
               value={queueMode}
               onChange={(e) => setQueueMode(e.target.value)}
-              className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
+              className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-2 py-1 text-xs outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
             >
               <option value="independent">Court-Independent (Level / Longest Wait)</option>
               <option value="dependent">Court-Dependent (Highest Court Priority & Ladder)</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Settings className="w-4 h-4 text-cyan-600" />
-            <label className="text-sm font-semibold text-gray-900">Courts:</label>
+          <div className="flex items-center gap-1.5">
+            <LayoutGrid className="w-3.5 h-3.5 text-cyan-600" />
+            <label className="text-xs font-semibold text-gray-900">Courts:</label>
             <select
               value={totalCourtCount}
               onChange={(e) => handleCourtCountChange(e.target.value)}
-              className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
+              className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-2 py-1 text-xs outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
                 <option key={num} value={num}>
@@ -1497,10 +1477,46 @@ export default function App() {
         </div>
       </div>
 
+      {/* NAVIGATION TABS (Aligned Left) */}
+      <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-1.5 flex items-center justify-start gap-2 shadow-2xs overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('courts')}
+          className={`px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'courts' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4" /> Courts & Queues
+        </button>
+        <button
+          onClick={() => setActiveTab('players')}
+          className={`px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'players' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <Users className="w-4 h-4" /> Players Roster
+        </button>
+        <button
+          onClick={() => setActiveTab('leaderboard')}
+          className={`px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'leaderboard' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <Trophy className="w-4 h-4" /> Leaderboard
+        </button>
+        <button
+          onClick={() => setActiveTab('matchLogs')}
+          className={`px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'matchLogs' ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-900/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <History className="w-4 h-4" /> Match Logs
+        </button>
+      </div>
+
       {/* MAIN CONTENT CONTAINER */}
       <main className="max-w-7xl mx-auto space-y-8">
         
-        {/* UPDATE 4 TABLEIZED SECTION: COURTS AND QUEUES */}
+        {/* TAB 1: COURTS AND QUEUES */}
         {activeTab === 'courts' && (
           <div className="space-y-8 animate-in fade-in duration-200">
             
@@ -1573,7 +1589,6 @@ export default function App() {
                     return (
                       <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
                         <div>
-                          {/* UPDATE 1: FIXED LAYOUT WHEN EDITING COURT NAME SO IT DOES NOT OVERLAP OTHER COMPONENTS */}
                           <div className="flex flex-wrap justify-between items-center gap-2 mb-3 pb-3 border-b border-gray-200">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               {editingCourtId === court.id ? (
@@ -1777,7 +1792,7 @@ export default function App() {
           </div>
         )}
 
-        {/* UPDATE 4 TABLEIZED SECTION: PLAYERS ROSTER */}
+        {/* TAB 2: PLAYERS ROSTER */}
         {activeTab === 'players' && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
             
@@ -1866,7 +1881,6 @@ export default function App() {
                 {roster.length === 0 ? (
                   <p className="text-center py-6 text-gray-400 text-sm italic">No players added yet.</p>
                 ) : (
-                  /* UPDATE 2: 1 ROW, 1 PLAYER IN THE ROSTER LIST VIEW */
                   <div className="grid grid-cols-1 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
                     {roster.map((player) => {
                       const isPlaying = activeCourtPlayerIds.has(player.id);
@@ -1936,227 +1950,234 @@ export default function App() {
           </section>
         )}
 
-        {/* UPDATE 4 TABLEIZED SECTION: LEADERBOARD & MATCH HISTORY */}
-        <div className="flex flex-col gap-8 pt-6 border-t border-gray-200">
-          
-          {/* LEADERBOARD TABLEIZED BLOCK */}
-          <div className="w-full space-y-6 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
+        {/* TAB 3: LEADERBOARD */}
+        {activeTab === 'leaderboard' && (
+          <div className="flex flex-col gap-8 animate-in fade-in duration-200">
             
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500" />
-                <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
-                  LeaderBoard
-                </h2>
-                <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-xl">
-                  {filteredLeaderboard.length} Players
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-48">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search player..."
-                    value={leaderboardSearch}
-                    onChange={(e) => setLeaderboardSearch(e.target.value)}
-                    className="w-full bg-white border border-gray-200 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 outline-none"
-                  />
+            <div className="w-full space-y-6 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
+              
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
+                    LeaderBoard
+                  </h2>
+                  <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-xl">
+                    {filteredLeaderboard.length} Players
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl">
-                  <button
-                    onClick={() => setLeaderboardFilter('all')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      leaderboardFilter === 'all' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setLeaderboardFilter('checkedIn')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      leaderboardFilter === 'checkedIn' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Checked In
-                  </button>
-                </div>
-              </div>
-            </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-48">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search player..."
+                      value={leaderboardSearch}
+                      onChange={(e) => setLeaderboardSearch(e.target.value)}
+                      className="w-full bg-white border border-gray-200 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 outline-none"
+                    />
+                  </div>
 
-            {podiumData.hasPodium && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
-                {renderPodiumStep(podiumData.rank2, 2)}
-                {renderPodiumStep(podiumData.rank1, 1)}
-                {renderPodiumStep(podiumData.rank3, 3)}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {filteredLeaderboard.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
-                  No matching players found.
-                </div>
-              ) : (
-                filteredLeaderboard.map((player) => {
-                  const rawWinRatePercent = Math.round(player.rawWinRate * 100);
-                  const partnerName = getPartnerName(player.partnerId);
-
-                  return (
-                    <div
-                      key={player.id}
-                      className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden ${
-                        player.calculatedRank === 1 
-                          ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/10' 
-                          : player.calculatedRank === 2
-                          ? 'border-slate-300 bg-slate-50/10'
-                          : player.calculatedRank === 3
-                          ? 'border-amber-800/30 bg-amber-900/5'
-                          : 'border-gray-200'
+                  <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl">
+                    <button
+                      onClick={() => setLeaderboardFilter('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        leaderboardFilter === 'all' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      <div className="flex items-center gap-3.5 min-w-[240px]">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                      All
+                    </button>
+                    <button
+                      onClick={() => setLeaderboardFilter('checkedIn')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        leaderboardFilter === 'checkedIn' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Checked In
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {podiumData.hasPodium && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                  {renderPodiumStep(podiumData.rank2, 2)}
+                  {renderPodiumStep(podiumData.rank1, 1)}
+                  {renderPodiumStep(podiumData.rank3, 3)}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {filteredLeaderboard.length === 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
+                    No matching players found.
+                  </div>
+                ) : (
+                  filteredLeaderboard.map((player) => {
+                    const rawWinRatePercent = Math.round(player.rawWinRate * 100);
+                    const partnerName = getPartnerName(player.partnerId);
+
+                    return (
+                      <div
+                        key={player.id}
+                        className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden ${
                           player.calculatedRank === 1 
-                            ? 'bg-amber-400 text-amber-950 shadow-xs' 
+                            ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/10' 
                             : player.calculatedRank === 2
-                            ? 'bg-slate-300 text-slate-800'
+                            ? 'border-slate-300 bg-slate-50/10'
                             : player.calculatedRank === 3
-                            ? 'bg-amber-800/20 text-amber-900'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          #{player.calculatedRank}
+                            ? 'border-amber-800/30 bg-amber-900/5'
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-[240px]">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                            player.calculatedRank === 1 
+                              ? 'bg-amber-400 text-amber-950 shadow-xs' 
+                              : player.calculatedRank === 2
+                              ? 'bg-slate-300 text-slate-800'
+                              : player.calculatedRank === 3
+                              ? 'bg-amber-800/20 text-amber-900'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            #{player.calculatedRank}
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
+                              {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
+
+                              <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                                {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
+                              </span>
+                            </div>
+
+                            {partnerName && (
+                              <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
+                                <Link className="w-3 h-3" /> Partner: {partnerName}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
-                            {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
+                        <div className="w-full md:w-1/3 space-y-1.5">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500 font-medium">Raw Win %</span>
+                            <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${rawWinRatePercent}%` }}
+                            />
+                          </div>
+                        </div>
 
-                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
-                              {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
+                        <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
+                            <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
+                          </div>
+
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
+                            <span className="text-gray-800 font-bold">
+                              <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
                             </span>
                           </div>
 
-                          {partnerName && (
-                            <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
-                              <Link className="w-3 h-3" /> Partner: {partnerName}
-                            </div>
-                          )}
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
+                            <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                          </div>
+
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
+                            <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
+                          </div>
                         </div>
                       </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
-                      <div className="w-full md:w-1/3 space-y-1.5">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500 font-medium">Raw Win %</span>
-                          <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
-                            }`}
-                            style={{ width: `${rawWinRatePercent}%` }}
-                          />
-                        </div>
-                      </div>
+          </div>
+        )}
 
-                      <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
-                        <div className="px-1">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
-                          <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
-                        </div>
+        {/* TAB 4: MATCH LOGS */}
+        {activeTab === 'matchLogs' && (
+          <div className="flex flex-col gap-8 animate-in fade-in duration-200">
+            
+            <div className="w-full space-y-4 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-cyan-600" />
+                  <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
+                    Match Logs
+                  </h2>
+                </div>
+                <span className="text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl">
+                  {matchHistory.length} Matches Recorded
+                </span>
+              </div>
 
-                        <div className="px-1">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
-                          <span className="text-gray-800 font-bold">
-                            <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {matchHistory.length === 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
+                    No completed matches recorded yet.
+                  </div>
+                ) : (
+                  matchHistory.map((m) => (
+                    <div key={m.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs text-gray-900 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">
+                            Match #{m.matchNumber}
+                          </span>
+                          <span className="text-xs font-bold text-cyan-700">
+                            {m.courtName}
+                          </span>
+                          <span className="text-[10px] font-semibold text-gray-400 font-mono">
+                            ({formatDuration(m.durationSec)})
                           </span>
                         </div>
-
-                        <div className="px-1">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
-                          <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
-                        </div>
-
-                        <div className="px-1">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
-                          <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
+                        <div className="text-xs font-medium text-gray-800">
+                          <span className={m.winningTeam === 'A' ? 'font-bold text-emerald-600' : 'text-gray-600'}>
+                            {m.teamA.join(' & ')}
+                          </span>
+                          <span className="text-gray-400 mx-2">vs</span>
+                          <span className={m.winningTeam === 'B' ? 'font-bold text-emerald-600' : 'text-gray-600'}>
+                            {m.teamB.join(' & ')}
+                          </span>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
 
-          {/* MATCH HISTORY TABLEIZED BLOCK */}
-          <div className="w-full space-y-4 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
-            <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <History className="w-5 h-5 text-cyan-600" />
-                <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
-                  Match Logs
-                </h2>
+                      <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-2 md:pt-0">
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Winner: Team {m.winningTeam}
+                        </span>
+                        <button
+                          onClick={() => handleSwapMatchWinner(m.id)}
+                          className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-gray-200"
+                          title="Swap Match Winner"
+                        >
+                          <Repeat className="w-3.5 h-3.5" /> Swap Winner
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <span className="text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl">
-                {matchHistory.length} Matches Recorded
-              </span>
             </div>
 
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-              {matchHistory.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
-                  No completed matches recorded yet.
-                </div>
-              ) : (
-                matchHistory.map((m) => (
-                  <div key={m.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-gray-900 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">
-                          Match #{m.matchNumber}
-                        </span>
-                        <span className="text-xs font-bold text-cyan-700">
-                          {m.courtName}
-                        </span>
-                        <span className="text-[10px] font-semibold text-gray-400 font-mono">
-                          ({formatDuration(m.durationSec)})
-                        </span>
-                      </div>
-                      <div className="text-xs font-medium text-gray-800">
-                        <span className={m.winningTeam === 'A' ? 'font-bold text-emerald-600' : 'text-gray-600'}>
-                          {m.teamA.join(' & ')}
-                        </span>
-                        <span className="text-gray-400 mx-2">vs</span>
-                        <span className={m.winningTeam === 'B' ? 'font-bold text-emerald-600' : 'text-gray-600'}>
-                          {m.teamB.join(' & ')}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-2 md:pt-0">
-                      <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Winner: Team {m.winningTeam}
-                      </span>
-                      <button
-                        onClick={() => handleSwapMatchWinner(m.id)}
-                        className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-gray-200"
-                        title="Swap Match Winner"
-                      >
-                        <Repeat className="w-3.5 h-3.5" /> Swap Winner
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
-
-        </div>
+        )}
 
       </main>
     </div>
