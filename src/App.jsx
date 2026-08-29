@@ -604,14 +604,14 @@ export default function App() {
         if (player.gamesPlayed === 0) return true;
         return player.assignedCourt === courtId;
       })
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0)); // Strictly follow queueing order
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
   };
 
   const getQueueForLevelIndependent = (levelNum) => {
-  return roster
-    .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-    .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0)); // Strictly follow queueing order
-};
+    return roster
+      .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
+  };
 
   const formatWaitTime = (checkedInAt) => {
     if (!checkedInAt) return '0m 0s';
@@ -628,16 +628,7 @@ export default function App() {
     const selected = [];
     const usedIds = new Set();
 
-    const partnerPair = levelQueue.find(p => p.partnerId && levelQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
-    if (partnerPair) {
-      const partner = levelQueue.find(p => p.id === partnerPair.partnerId);
-      if (partner) {
-        selected.push(partnerPair, partner);
-        usedIds.add(partnerPair.id);
-        usedIds.add(partner.id);
-      }
-    }
-
+    // Pull players strictly in FIFO order, only pulling partners if they are next in line / available within the top pool
     for (const p of levelQueue) {
       if (usedIds.has(p.id)) continue;
       
@@ -647,7 +638,7 @@ export default function App() {
           selected.push(p, partner);
           usedIds.add(p.id);
           usedIds.add(partner.id);
-        } else if (!partner) {
+        } else {
           selected.push(p);
           usedIds.add(p.id);
         }
@@ -761,16 +752,7 @@ export default function App() {
       const selected = [];
       const usedIds = new Set();
 
-      const partnerPair = courtQueue.find(p => p.partnerId && courtQueue.some(partner => partner.id === p.partnerId && !usedIds.has(partner.id)));
-      if (partnerPair) {
-        const partner = courtQueue.find(p => p.id === partnerPair.partnerId);
-        if (partner) {
-          selected.push(partnerPair, partner);
-          usedIds.add(partnerPair.id);
-          usedIds.add(partner.id);
-        }
-      }
-
+      // Pull players strictly in FIFO order, only pulling partners if available within the top pool
       for (const p of courtQueue) {
         if (usedIds.has(p.id)) continue;
         if (p.partnerId) {
@@ -779,7 +761,7 @@ export default function App() {
             selected.push(p, partner);
             usedIds.add(p.id);
             usedIds.add(partner.id);
-          } else if (!partner) {
+          } else {
             selected.push(p);
             usedIds.add(p.id);
           }
@@ -1383,7 +1365,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Col 2: Court / Level (Separate Column with distinct background color) */}
+                        {/* Col 2: Court / Level */}
                         <div className="flex items-center md:justify-center">
                           <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
                             {courtOrLevelVal}
@@ -1498,7 +1480,7 @@ export default function App() {
         </section>
       )}
 
-      {/* SEPARATED SYSTEM SETTINGS (Queue Match Type & Courts) */}
+      {/* SEPARATED SYSTEM SETTINGS */}
       <div className="max-w-7xl mx-auto mb-4 bg-white border border-gray-200 rounded-2xl p-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-end">
           <div className="flex items-center gap-1.5">
@@ -1532,7 +1514,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* NAVIGATION TABS (Aligned Left) */}
+      {/* NAVIGATION TABS */}
       <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-1.5 flex items-center justify-start gap-2 shadow-2xs overflow-x-auto">
         <button
           onClick={() => setActiveTab('courts')}
@@ -2124,7 +2106,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Col 2: Court / Level (Separate Column with distinct background color) */}
+                            {/* Col 2: Court / Level */}
                             <div className="flex items-center md:justify-center">
                               <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
                                 {courtOrLevelVal}
