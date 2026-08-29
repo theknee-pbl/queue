@@ -1297,7 +1297,7 @@ export default function App() {
                 return (
                   <div
                     key={player.id}
-                    className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden ${
+                    className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs grid grid-cols-1 md:grid-cols-5 items-center gap-4 relative overflow-hidden ${
                       player.calculatedRank === 1 
                         ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/20' 
                         : player.calculatedRank === 2
@@ -1307,7 +1307,8 @@ export default function App() {
                         : 'border-gray-200'
                     }`}
                   >
-                    <div className="flex items-center gap-3.5 min-w-[240px]">
+                    {/* Col 1: Rank & Name */}
+                    <div className="flex items-center gap-3.5 md:col-span-1">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                         player.calculatedRank === 1 
                           ? 'bg-amber-400 text-amber-950 shadow-xs' 
@@ -1320,24 +1321,29 @@ export default function App() {
                         #{player.calculatedRank}
                       </div>
 
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
-                          {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                          <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
-                            {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
-                          </span>
+                          <span className="font-extrabold text-sm text-gray-900 truncate">{player.name}</span>
+                          {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
                         </div>
 
                         {partnerName && (
                           <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
-                            <Link className="w-3 h-3" /> Fixed Partner: {partnerName}
+                            <Link className="w-3 h-3 shrink-0" /> Partner: {partnerName}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="w-full md:w-1/3 space-y-1.5">
+                    {/* Col 2: Court / Level (Separate Column) */}
+                    <div className="flex items-center md:justify-center">
+                      <span className="px-2.5 py-1 rounded-lg font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200 inline-block">
+                        {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Level ${player.level}`}
+                      </span>
+                    </div>
+
+                    {/* Col 3: Raw Win % */}
+                    <div className="space-y-1.5 md:col-span-1">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-gray-500 font-medium">Raw Win %</span>
                         <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
@@ -1352,7 +1358,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
+                    {/* Col 4 & 5: Stats */}
+                    <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
                       <div className="px-1">
                         <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
                         <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
@@ -1371,7 +1378,7 @@ export default function App() {
                       </div>
 
                       <div className="px-1">
-                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
+                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Time</span>
                         <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
                       </div>
                     </div>
@@ -2021,7 +2028,7 @@ export default function App() {
                     return (
                       <div
                         key={player.id}
-                        className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden ${
+                        className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs grid grid-cols-1 md:grid-cols-5 items-center gap-4 relative overflow-hidden ${
                           player.calculatedRank === 1 
                             ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/10' 
                             : player.calculatedRank === 2
@@ -2031,7 +2038,8 @@ export default function App() {
                             : 'border-gray-200'
                         }`}
                       >
-                        <div className="flex items-center gap-3.5 min-w-[240px]">
+                        {/* Col 1: Rank & Name */}
+                        <div className="flex items-center gap-3.5 md:col-span-1">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                             player.calculatedRank === 1 
                               ? 'bg-amber-400 text-amber-950 shadow-xs' 
@@ -2044,25 +2052,29 @@ export default function App() {
                             #{player.calculatedRank}
                           </div>
 
-                          <div className="space-y-1">
+                          <div className="space-y-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
-                              {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
-
-                              <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
-                                {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
-                              </span>
+                              <span className="font-extrabold text-sm text-gray-900 truncate">{player.name}</span>
+                              {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
                             </div>
 
                             {partnerName && (
                               <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
-                                <Link className="w-3 h-3" /> Partner: {partnerName}
+                                <Link className="w-3 h-3 shrink-0" /> Partner: {partnerName}
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="w-full md:w-1/3 space-y-1.5">
+                        {/* Col 2: Court / Level (Separate Column) */}
+                        <div className="flex items-center md:justify-center">
+                          <span className="px-2.5 py-1 rounded-lg font-bold text-xs bg-amber-50 text-amber-700 border border-amber-200 inline-block">
+                            {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Level ${player.level}`}
+                          </span>
+                        </div>
+
+                        {/* Col 3: Raw Win % */}
+                        <div className="space-y-1.5 md:col-span-1">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500 font-medium">Raw Win %</span>
                             <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
@@ -2077,7 +2089,8 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
+                        {/* Col 4 & 5: Stats */}
+                        <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
                           <div className="px-1">
                             <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
                             <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
@@ -2096,7 +2109,7 @@ export default function App() {
                           </div>
 
                           <div className="px-1">
-                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Time</span>
                             <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
                           </div>
                         </div>
@@ -2115,16 +2128,24 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-in fade-in duration-200">
             
             <div className="w-full space-y-4 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
-              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                   <History className="w-5 h-5 text-cyan-600" />
                   <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
                     Match Logs
                   </h2>
                 </div>
-                <span className="text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl">
-                  {matchHistory.length} Matches Recorded
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl">
+                    {matchHistory.length} Matches Recorded
+                  </span>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer border border-gray-200"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Print Match Logs
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
