@@ -604,14 +604,14 @@ export default function App() {
         if (player.gamesPlayed === 0) return true;
         return player.assignedCourt === courtId;
       })
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
+      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0)); // Strictly follow queueing order
   };
 
   const getQueueForLevelIndependent = (levelNum) => {
-    return roster
-      .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
-  };
+  return roster
+    .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
+    .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0)); // Strictly follow queueing order
+};
 
   const formatWaitTime = (checkedInAt) => {
     if (!checkedInAt) return '0m 0s';
