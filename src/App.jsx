@@ -621,24 +621,24 @@ export default function App() {
     return `${mins}m ${secs}s`;
   };
 
-  const getNextMatchFromQueueIndependent = (levelNum) => {
-    const levelQueue = getQueueForLevelIndependent(levelNum);
-    if (levelQueue.length < 4) return { teamA: [], teamB: [], valid: false };
+  // --- UPDATED MATCH SELECTION WITH PARTNER-FIRST TRAVERSAL & TEAM ALLOCATION ---
+  const getNextMatchFromQueue = (queueSource) => {
+    if (queueSource.length < 4) return { teamA: [], teamB: [], valid: false };
 
     const selected = [];
     const usedIds = new Set();
 
-    // Pull players strictly in FIFO order, only pulling partners if they are next in line / available within the top pool
-    for (const p of levelQueue) {
+    // Partner-First Traversal logic applied universally across all courts or level queueing
+    for (const p of queueSource) {
       if (usedIds.has(p.id)) continue;
       
       if (p.partnerId) {
-        const partner = levelQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
+        const partner = queueSource.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
         if (partner && selected.length <= 2) {
           selected.push(p, partner);
           usedIds.add(p.id);
           usedIds.add(partner.id);
-        } else {
+        } else if (!partner) {
           selected.push(p);
           usedIds.add(p.id);
         }
@@ -659,6 +659,7 @@ export default function App() {
     const p2 = selected[2];
     const p3 = selected[3];
 
+    // Team Allocation: Ensures paired partners play alongside each other on the same team
     const isP0P1Partner = p0.partnerId === p1.id;
     const isP2P3Partner = p2.partnerId === p3.id;
 
@@ -673,7 +674,13 @@ export default function App() {
       teamB = [p1, p2];
     }
 
-    return { teamA, teamB, valid: true, level: levelNum };
+    return { teamA, teamB, valid: true };
+  };
+
+  const getNextMatchFromQueueIndependent = (levelNum) => {
+    const levelQueue = getQueueForLevelIndependent(levelNum);
+    const result = getNextMatchFromQueue(levelQueue);
+    return { ...result, level: levelNum };
   };
 
   const getPrioritizedCandidateMatchesIndependent = () => {
@@ -747,50 +754,10 @@ export default function App() {
         return;
       }
 
-      let teamA = [];
-      let teamB = [];
-      const selected = [];
-      const usedIds = new Set();
-
-      // Pull players strictly in FIFO order, only pulling partners if available within the top pool
-      for (const p of courtQueue) {
-        if (usedIds.has(p.id)) continue;
-        if (p.partnerId) {
-          const partner = courtQueue.find((item) => item.id === p.partnerId && !usedIds.has(item.id));
-          if (partner && selected.length <= 2) {
-            selected.push(p, partner);
-            usedIds.add(p.id);
-            usedIds.add(partner.id);
-          } else {
-            selected.push(p);
-            usedIds.add(p.id);
-          }
-        } else {
-          selected.push(p);
-          usedIds.add(p.id);
-        }
-        if (selected.length >= 4) break;
-      }
-
-      if (selected.length < 4) {
-        alert("Could not pair available players evenly.");
+      const matchResult = getNextMatchFromQueue(courtQueue);
+      if (!matchResult.valid) {
+        alert("Could not pair available players evenly with partner-first traversal.");
         return;
-      }
-
-      const p0 = selected[0];
-      const p1 = selected[1];
-      const p2 = selected[2];
-      const p3 = selected[3];
-
-      if (p0.partnerId === p1.id) {
-        teamA = [p0, p1];
-        teamB = [p2, p3];
-      } else if (p2.partnerId === p3.id) {
-        teamA = [p2, p3];
-        teamB = [p0, p1];
-      } else {
-        teamA = [p0, p3];
-        teamB = [p1, p2];
       }
 
       setCourts((prev) =>
@@ -798,8 +765,8 @@ export default function App() {
           if (c.id === courtId) {
             return {
               ...c,
-              teamA,
-              teamB,
+              teamA: matchResult.teamA,
+              teamB: matchResult.teamB,
               isLive: true,
               startTime: Date.now()
             };
