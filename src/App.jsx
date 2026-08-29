@@ -160,12 +160,12 @@ export default function App() {
     const saved = localStorage.getItem('pickleq_roster');
     if (saved) return JSON.parse(saved);
     return [
-      { id: '1', name: 'Alex Rivera', gamesPlayed: 6, wins: 5, losses: 1, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {}, scheduleStrength: 0 },
-      { id: '2', name: 'Jordan Chen', gamesPlayed: 6, wins: 4, losses: 2, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {}, scheduleStrength: 0 },
-      { id: '3', name: 'Sam Taylor', gamesPlayed: 2, wins: 2, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {}, scheduleStrength: 0 },
-      { id: '4', name: 'Morgan Smith', gamesPlayed: 5, wins: 3, losses: 2, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {}, scheduleStrength: 0 },
-      { id: '5', name: 'Chris Lee', gamesPlayed: 1, wins: 1, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {}, scheduleStrength: 0 },
-      { id: '6', name: 'Pat Gomez', gamesPlayed: 5, wins: 1, losses: 4, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {}, scheduleStrength: 0 },
+      { id: '1', name: 'Alex Rivera', gamesPlayed: 6, wins: 5, losses: 1, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 1800, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {}, scheduleStrength: 0 },
+      { id: '2', name: 'Jordan Chen', gamesPlayed: 6, wins: 4, losses: 2, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 1800, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {}, scheduleStrength: 0 },
+      { id: '3', name: 'Sam Taylor', gamesPlayed: 2, wins: 2, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 600, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {}, scheduleStrength: 0 },
+      { id: '4', name: 'Morgan Smith', gamesPlayed: 5, wins: 3, losses: 2, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 1500, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {}, scheduleStrength: 0 },
+      { id: '5', name: 'Chris Lee', gamesPlayed: 1, wins: 1, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 300, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {}, scheduleStrength: 0 },
+      { id: '6', name: 'Pat Gomez', gamesPlayed: 5, wins: 1, losses: 4, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 1500, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {}, scheduleStrength: 0 },
     ];
   });
 
@@ -202,7 +202,6 @@ export default function App() {
     }).filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
 
     const sorted = [...eligibleRoster].sort((a, b) => {
-      // 0. Qualified Status Priority (Qualified players rank above Provisional players)
       if (a.isQualified !== b.isQualified) {
         return a.isQualified ? -1 : 1;
       }
@@ -251,11 +250,9 @@ export default function App() {
     });
   }, [roster, queueMode, totalCourtCount]);
 
-  // Split summary lists: Qualified vs Provisional
   const qualifiedRoster = useMemo(() => rankedRoster.filter(p => p.isQualified), [rankedRoster]);
   const provisionalRoster = useMemo(() => rankedRoster.filter(p => !p.isQualified), [rankedRoster]);
 
-  // Extract Podium Players
   const podiumData = useMemo(() => {
     const rank1 = qualifiedRoster.filter(p => p.calculatedRank === 1);
     const rank2 = qualifiedRoster.filter(p => p.calculatedRank === 2);
@@ -263,7 +260,6 @@ export default function App() {
     return { rank1, rank2, rank3, hasPodium: rank1.length > 0 };
   }, [qualifiedRoster]);
 
-  // Filtered Leaderboard computation
   const filteredLeaderboard = useMemo(() => {
     return rankedRoster.filter(player => {
       const matchesFilter = leaderboardFilter === 'checkedIn' ? player.isCheckedIn : true;
@@ -1069,7 +1065,6 @@ export default function App() {
     const namesJoined = players.map(p => p.name).join(' | ');
     const samplePlayer = players[0];
     const rawWinRatePercent = Math.round(samplePlayer.rawWinRate * 100);
-    const bayesWinRatePercent = Math.round(samplePlayer.bayesianWinRate * 100);
 
     if (rankNum === 1) {
       return (
@@ -1088,9 +1083,6 @@ export default function App() {
               </span>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs">
                 <span className="text-emerald-700 font-bold">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
-                <span className="text-amber-800 font-black bg-amber-200/40 px-2 py-0.5 rounded-md">
-                  Bayesian Rating: {bayesWinRatePercent}%
-                </span>
               </div>
             </div>
           </div>
@@ -1115,9 +1107,6 @@ export default function App() {
               </span>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
                 <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
-                <span className="text-slate-700 font-bold bg-slate-200/60 px-2 py-0.5 rounded-md">
-                  Bayesian Rating: {bayesWinRatePercent}%
-                </span>
               </div>
             </div>
           </div>
@@ -1142,9 +1131,6 @@ export default function App() {
               </span>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
                 <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
-                <span className="text-amber-900 font-bold bg-amber-100/60 px-2 py-0.5 rounded-md">
-                  Bayesian Rating: {bayesWinRatePercent}%
-                </span>
               </div>
             </div>
           </div>
@@ -1164,7 +1150,7 @@ export default function App() {
               PBL Queueing
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              {queueMode === 'independent' ? 'Court-Independent Level Queue & Bayesian Rating System' : 'Highest Court Priority Ladder & Bayesian Rating System'}
+              {queueMode === 'independent' ? 'Court-Independent Level Queue & Rating System' : 'Highest Court Priority Ladder & Rating System'}
             </p>
           </div>
         </div>
@@ -1309,7 +1295,6 @@ export default function App() {
             ) : (
               qualifiedRoster.map((player) => {
                 const rawWinRatePercent = Math.round(player.rawWinRate * 100);
-                const bayesWinRatePercent = Math.round(player.bayesianWinRate * 100);
                 const partnerName = getPartnerName(player.partnerId);
 
                 return (
@@ -1370,27 +1355,27 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold">
-                      <div className="text-center px-2">
+                    <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
+                      <div className="px-1">
                         <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
                         <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
                       </div>
 
-                      <div className="text-center px-2">
+                      <div className="px-1">
                         <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
                         <span className="text-gray-800 font-bold">
                           <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
                         </span>
                       </div>
 
-                      <div className="text-center px-2">
-                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Bayes Rating</span>
-                        <span className="text-amber-600 font-bold">{bayesWinRatePercent}%</span>
-                      </div>
-
-                      <div className="text-center px-2">
+                      <div className="px-1">
                         <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
                         <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                      </div>
+
+                      <div className="px-1">
+                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
+                        <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
                       </div>
                     </div>
                   </div>
@@ -1434,6 +1419,8 @@ export default function App() {
                       <div className="flex items-center gap-4 text-gray-600 font-medium">
                         <span>Played: <strong className="text-gray-900">{player.gamesPlayed}</strong></span>
                         <span>Record: <strong className="text-emerald-600">{player.wins}W</strong> - <strong className="text-rose-600">{player.losses}L</strong></span>
+                        <span>SoS: <strong className="text-purple-600">{player.scheduleStrength || 0}%</strong></span>
+                        <span>Time: <strong className="text-cyan-700 font-mono">{formatDuration(player.timePlayedSec)}</strong></span>
                         <span>Raw Win Rate: <strong className="text-gray-900">{rawWinRatePercent}%</strong></span>
                       </div>
                     </div>
@@ -1955,7 +1942,7 @@ export default function App() {
         {/* LEADERBOARD & MATCH HISTORY */}
         <div className="flex flex-col gap-8 pt-6 border-t border-gray-200">
           
-          {/* ROW 1: BAYESIAN RANKED STANDINGS */}
+          {/* ROW 1: RANKED STANDINGS */}
           <div className="w-full space-y-6">
             
             {/* LEADERBOARD CONTROLS & HEADER */}
@@ -2022,7 +2009,6 @@ export default function App() {
               ) : (
                 filteredLeaderboard.map((player) => {
                   const rawWinRatePercent = Math.round(player.rawWinRate * 100);
-                  const bayesWinRatePercent = Math.round(player.bayesianWinRate * 100);
                   const partnerName = getPartnerName(player.partnerId);
 
                   return (
@@ -2084,27 +2070,27 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold">
-                        <div className="text-center px-2">
+                      <div className="grid grid-cols-4 gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center shrink-0">
+                        <div className="px-1">
                           <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
                           <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
                         </div>
 
-                        <div className="text-center px-2">
+                        <div className="px-1">
                           <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
                           <span className="text-gray-800 font-bold">
                             <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
                           </span>
                         </div>
 
-                        <div className="text-center px-2">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Bayes Rating</span>
-                          <span className="text-amber-600 font-bold">{bayesWinRatePercent}%</span>
-                        </div>
-
-                        <div className="text-center px-2">
+                        <div className="px-1">
                           <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
                           <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                        </div>
+
+                        <div className="px-1">
+                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Time Played</span>
+                          <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
                         </div>
                       </div>
                     </div>
