@@ -1111,6 +1111,7 @@ export default function App() {
               </div>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs">
                 <span className="text-emerald-700 font-bold">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
+                <span className="text-amber-700 font-extrabold bg-amber-200/60 px-2.5 py-0.5 rounded-md border border-amber-300">Raw Win: {rawWinRatePercent}%</span>
               </div>
             </div>
           </div>
@@ -1138,6 +1139,7 @@ export default function App() {
               </div>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
                 <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
+                <span className="text-slate-700 font-bold bg-slate-200/70 px-2 py-0.5 rounded-md border border-slate-300">Raw Win: {rawWinRatePercent}%</span>
               </div>
             </div>
           </div>
@@ -1165,6 +1167,7 @@ export default function App() {
               </div>
               <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
                 <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
+                <span className="text-amber-900 font-bold bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300/40">Raw Win: {rawWinRatePercent}%</span>
               </div>
             </div>
           </div>
