@@ -150,7 +150,7 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
-  // --- COMPREHENSIVE SORTING & RANKING HOOK (1223 Standard Competition Ranking) ---
+  // --- COMPREHENSIVE SORTING & RANKING HOOK (Standard Dense Ranking: 1, 2, 2, 3) ---
   const rankedRoster = useMemo(() => {
     const getHeadToHeadWinner = (playerA, playerB) => {
       if (!playerA.headToHead || !playerB.headToHead) return 0;
@@ -223,7 +223,7 @@ export default function App() {
           : (prev.level !== player.level || prevWinRate !== currWinRate || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0);
 
         if (isDifferent) {
-          currentRank = index + 1; // Standard competition ranking (1223)
+          currentRank += 1; // Increment sequentially by 1 instead of jumping to index + 1
         }
       }
       return { ...player, calculatedRank: currentRank };
