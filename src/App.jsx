@@ -33,10 +33,11 @@ import {
   TrendingUp,
   Filter,
   Search,
-  Activity
+  Activity,
+  ShieldAlert
 } from 'lucide-react';
 
-// Custom Logo Component using src/assets/logo.jfif
+// Custom Logo Component
 function PBLLogo({ className = "w-20 h-20" }) {
   return (
     <div className={`${className} shrink-0 overflow-hidden rounded-xl flex items-center justify-center bg-gray-100 border border-gray-200`}>
@@ -79,6 +80,37 @@ const calculateScheduleStrength = (playerId, rosterData, historyData) => {
 
   if (countedOpponents === 0) return 0;
   return Math.round((totalOpponentWinRate / countedOpponents) * 100);
+};
+
+// --- CORE BAYESIAN & RANKING METRIC CALCULATOR ---
+const calculateAdvancedPlayerMetrics = (player) => {
+  const games = player.gamesPlayed || 0;
+  const wins = player.wins || 0;
+  
+  // Bayesian Average Parameters
+  const m = 5; // Pseudo-games weight
+  const mu = 0.50; // Global target win rate baseline (50%)
+  
+  // 1. Bayesian Adjusted Win Rate
+  const bayesianWinRate = (wins + (m * mu)) / (games + m);
+
+  // 2. Active Participation Multiplier: 1 - e^(-k * Games)
+  const k = 0.2; 
+  const participationMultiplier = 1 - Math.exp(-k * games);
+
+  // 3. Final Score
+  const finalScore = bayesianWinRate * participationMultiplier;
+
+  // 4. Minimum Game Threshold Qualifier Flag
+  const MIN_GAMES_THRESHOLD = 5;
+  const isQualified = games >= MIN_GAMES_THRESHOLD;
+
+  return {
+    rawWinRate: games > 0 ? (wins / games) : 0,
+    bayesianWinRate,
+    finalScore,
+    isQualified
+  };
 };
 
 export default function App() {
@@ -128,12 +160,12 @@ export default function App() {
     const saved = localStorage.getItem('pickleq_roster');
     if (saved) return JSON.parse(saved);
     return [
-      { id: '1', name: 'Alex Rivera', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {}, scheduleStrength: 0 },
-      { id: '2', name: 'Jordan Chen', gamesPlayed: 0, wins: 0, losses: 0, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {}, scheduleStrength: 0 },
-      { id: '3', name: 'Sam Taylor', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {}, scheduleStrength: 0 },
-      { id: '4', name: 'Morgan Smith', gamesPlayed: 0, wins: 0, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {}, scheduleStrength: 0 },
-      { id: '5', name: 'Chris Lee', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {}, scheduleStrength: 0 },
-      { id: '6', name: 'Pat Gomez', gamesPlayed: 0, wins: 0, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {}, scheduleStrength: 0 },
+      { id: '1', name: 'Alex Rivera', gamesPlayed: 6, wins: 5, losses: 1, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '2', checkedInAt: Date.now() - 620000, headToHead: {}, scheduleStrength: 0 },
+      { id: '2', name: 'Jordan Chen', gamesPlayed: 6, wins: 4, losses: 2, level: 1, assignedCourt: 1, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: '1', checkedInAt: Date.now() - 510000, headToHead: {}, scheduleStrength: 0 },
+      { id: '3', name: 'Sam Taylor', gamesPlayed: 2, wins: 2, losses: 0, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 415000, headToHead: {}, scheduleStrength: 0 },
+      { id: '4', name: 'Morgan Smith', gamesPlayed: 5, wins: 3, losses: 2, level: 2, assignedCourt: 2, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 305000, headToHead: {}, scheduleStrength: 0 },
+      { id: '5', name: 'Chris Lee', gamesPlayed: 1, wins: 1, losses: 0, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 210000, headToHead: {}, scheduleStrength: 0 },
+      { id: '6', name: 'Pat Gomez', gamesPlayed: 5, wins: 1, losses: 4, level: 3, assignedCourt: 3, courtGames: {}, timePlayedSec: 0, isCheckedIn: true, partnerId: null, checkedInAt: Date.now() - 95000, headToHead: {}, scheduleStrength: 0 },
     ];
   });
 
@@ -150,7 +182,7 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
-  // --- COMPREHENSIVE SORTING & RANKING HOOK (Standard Dense Ranking: 1, 2, 2, 3) ---
+  // --- ADVANCED RANKING HOOK WITH BAYESIAN SMOOTHING & PROVISIONAL TIER ---
   const rankedRoster = useMemo(() => {
     const getHeadToHeadWinner = (playerA, playerB) => {
       if (!playerA.headToHead || !playerB.headToHead) return 0;
@@ -164,19 +196,23 @@ export default function App() {
       return 0;
     };
 
-    const eligibleRoster = roster.filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
+    const eligibleRoster = roster.map(player => {
+      const metrics = calculateAdvancedPlayerMetrics(player);
+      return { ...player, ...metrics };
+    }).filter((p) => p.isCheckedIn || p.gamesPlayed > 0);
 
     const sorted = [...eligibleRoster].sort((a, b) => {
+      // 0. Qualified Status Priority (Qualified players rank above Provisional players)
+      if (a.isQualified !== b.isQualified) {
+        return a.isQualified ? -1 : 1;
+      }
+
       if (queueMode === 'dependent') {
         const courtA = a.assignedCourt || totalCourtCount;
         const courtB = b.assignedCourt || totalCourtCount;
-        if (courtA !== courtB) {
-          return courtA - courtB;
-        }
+        if (courtA !== courtB) return courtA - courtB;
 
-        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
-        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
-        if (winRateA !== winRateB) return winRateB - winRateA;
+        if (a.finalScore !== b.finalScore) return b.finalScore - a.finalScore;
 
         const sosA = a.scheduleStrength || 0;
         const sosB = b.scheduleStrength || 0;
@@ -184,28 +220,15 @@ export default function App() {
 
         return getHeadToHeadWinner(a, b);
       } else {
-        if (b.level !== a.level) {
-          return b.level - a.level;
-        }
+        if (b.level !== a.level) return b.level - a.level;
 
-        const winRateA = a.gamesPlayed > 0 ? (a.wins / a.gamesPlayed) : 0;
-        const winRateB = b.gamesPlayed > 0 ? (b.wins / b.gamesPlayed) : 0;
-        if (winRateA !== winRateB) {
-          return winRateB - winRateA;
-        }
+        if (a.finalScore !== b.finalScore) return b.finalScore - a.finalScore;
 
         const sosA = a.scheduleStrength || 0;
         const sosB = b.scheduleStrength || 0;
-        if (sosA !== sosB) {
-          return sosB - sosA;
-        }
+        if (sosA !== sosB) return sosB - sosA;
 
-        const h2h = getHeadToHeadWinner(a, b);
-        if (h2h !== 0) {
-          return h2h;
-        }
-
-        return 0;
+        return getHeadToHeadWinner(a, b);
       }
     });
 
@@ -213,30 +236,32 @@ export default function App() {
     return sorted.map((player, index, arr) => {
       if (index > 0) {
         const prev = arr[index - 1];
-        const prevWinRate = prev.gamesPlayed > 0 ? (prev.wins / prev.gamesPlayed) : 0;
-        const currWinRate = player.gamesPlayed > 0 ? (player.wins / player.gamesPlayed) : 0;
         const prevCourt = prev.assignedCourt || totalCourtCount;
         const currCourt = player.assignedCourt || totalCourtCount;
 
         const isDifferent = queueMode === 'dependent'
-          ? (prevCourt !== currCourt || prevWinRate !== currWinRate || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0)
-          : (prev.level !== player.level || prevWinRate !== currWinRate || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0);
+          ? (prev.isQualified !== player.isQualified || prevCourt !== currCourt || prev.finalScore !== player.finalScore || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0)
+          : (prev.isQualified !== player.isQualified || prev.level !== player.level || prev.finalScore !== player.finalScore || (prev.scheduleStrength || 0) !== (player.scheduleStrength || 0) || getHeadToHeadWinner(prev, player) !== 0);
 
         if (isDifferent) {
-          currentRank += 1; // Increment sequentially by 1 instead of jumping to index + 1
+          currentRank += 1;
         }
       }
       return { ...player, calculatedRank: currentRank };
     });
   }, [roster, queueMode, totalCourtCount]);
 
-  // Extract Podium Players (Groups players by ranks 1, 2, and 3 to support tied players)
+  // Split summary lists: Qualified vs Provisional
+  const qualifiedRoster = useMemo(() => rankedRoster.filter(p => p.isQualified), [rankedRoster]);
+  const provisionalRoster = useMemo(() => rankedRoster.filter(p => !p.isQualified), [rankedRoster]);
+
+  // Extract Podium Players
   const podiumData = useMemo(() => {
-    const rank1 = rankedRoster.filter(p => p.calculatedRank === 1);
-    const rank2 = rankedRoster.filter(p => p.calculatedRank === 2);
-    const rank3 = rankedRoster.filter(p => p.calculatedRank === 3);
+    const rank1 = qualifiedRoster.filter(p => p.calculatedRank === 1);
+    const rank2 = qualifiedRoster.filter(p => p.calculatedRank === 2);
+    const rank3 = qualifiedRoster.filter(p => p.calculatedRank === 3);
     return { rank1, rank2, rank3, hasPodium: rank1.length > 0 };
-  }, [rankedRoster]);
+  }, [qualifiedRoster]);
 
   // Filtered Leaderboard computation
   const filteredLeaderboard = useMemo(() => {
@@ -1037,13 +1062,14 @@ export default function App() {
     return partner ? partner.name : null;
   };
 
-  // --- PODIUM RENDER HELPER (Names separated with | if tied) ---
+  // --- PODIUM RENDER HELPER ---
   const renderPodiumStep = (players, rankNum) => {
     if (!players || players.length === 0) return null;
 
     const namesJoined = players.map(p => p.name).join(' | ');
     const samplePlayer = players[0];
-    const winRate = samplePlayer.gamesPlayed > 0 ? Math.round((samplePlayer.wins / samplePlayer.gamesPlayed) * 100) : 0;
+    const rawWinRatePercent = Math.round(samplePlayer.rawWinRate * 100);
+    const bayesWinRatePercent = Math.round(samplePlayer.bayesianWinRate * 100);
 
     if (rankNum === 1) {
       return (
@@ -1060,9 +1086,11 @@ export default function App() {
               <span className="text-[11px] font-bold text-amber-800 bg-amber-200/60 px-2.5 py-0.5 rounded-full inline-block">
                 {queueMode === 'dependent' ? `Court ${samplePlayer.assignedCourt || 1}` : `Level ${samplePlayer.level}`}
               </span>
-              <div className="mt-1 flex justify-center items-center gap-2 text-xs">
-                <span className="text-emerald-700 font-bold">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
-                <span className="text-amber-700 font-black">{winRate}% Win Rate</span>
+              <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs">
+                <span className="text-emerald-700 font-bold">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
+                <span className="text-amber-800 font-black bg-amber-200/40 px-2 py-0.5 rounded-md">
+                  Bayesian Rating: {bayesWinRatePercent}%
+                </span>
               </div>
             </div>
           </div>
@@ -1085,9 +1113,11 @@ export default function App() {
               <span className="text-[11px] font-semibold text-slate-600 block">
                 {queueMode === 'dependent' ? `Court ${samplePlayer.assignedCourt || 1}` : `Level ${samplePlayer.level}`}
               </span>
-              <div className="mt-1 flex justify-center items-center gap-2 text-xs font-semibold">
-                <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
-                <span className="text-amber-600 font-bold">{winRate}%</span>
+              <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
+                <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
+                <span className="text-slate-700 font-bold bg-slate-200/60 px-2 py-0.5 rounded-md">
+                  Bayesian Rating: {bayesWinRatePercent}%
+                </span>
               </div>
             </div>
           </div>
@@ -1110,9 +1140,11 @@ export default function App() {
               <span className="text-[11px] font-semibold text-amber-800/80 block">
                 {queueMode === 'dependent' ? `Court ${samplePlayer.assignedCourt || 1}` : `Level ${samplePlayer.level}`}
               </span>
-              <div className="mt-1 flex justify-center items-center gap-2 text-xs font-semibold">
-                <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L</span>
-                <span className="text-amber-600 font-bold">{winRate}%</span>
+              <div className="mt-1 flex flex-col justify-center items-center gap-1 text-xs font-semibold">
+                <span className="text-emerald-600">{samplePlayer.wins}W - {samplePlayer.losses}L ({rawWinRatePercent}% Raw)</span>
+                <span className="text-amber-900 font-bold bg-amber-100/60 px-2 py-0.5 rounded-md">
+                  Bayesian Rating: {bayesWinRatePercent}%
+                </span>
               </div>
             </div>
           </div>
@@ -1132,7 +1164,7 @@ export default function App() {
               PBL Queueing
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              {queueMode === 'independent' ? 'Court-Independent Level Queue & Longest-Wait Match Generation' : 'Highest Court Priority & Ladder Match System'}
+              {queueMode === 'independent' ? 'Court-Independent Level Queue & Bayesian Rating System' : 'Highest Court Priority Ladder & Bayesian Rating System'}
             </p>
           </div>
         </div>
@@ -1237,7 +1269,7 @@ export default function App() {
         </div>
       )}
 
-      {/* SUMMARY BANNER / CARD-BASED UI MATCHED WITH LIVE STANDINGS */}
+      {/* SUMMARY MODAL */}
       {showSummaryModal && (
         <section className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-amber-500/40 rounded-3xl p-6 md:p-8 shadow-xl relative animate-in fade-in slide-in-from-top-4 duration-300">
           <button
@@ -1251,11 +1283,11 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Trophy className="w-7 h-7 text-amber-500" />
               <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
-                Session Final Summary (Ranked System)
+                Session Final Summary
               </h2>
             </div>
             <p className="text-gray-500 text-xs mt-1">
-              Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Ranked Players: <span className="text-cyan-600 font-bold">{rankedRoster.length}</span>
+              Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Ranked Players: <span className="text-cyan-600 font-bold">{qualifiedRoster.length}</span>
             </p>
           </div>
 
@@ -1268,15 +1300,16 @@ export default function App() {
             </div>
           )}
 
-          {/* CARDS LIST DISPLAY IN SUMMARY */}
+          {/* SUMMARY LIST DISPLAY: QUALIFIED PLAYERS */}
           <div className="space-y-3 mb-6">
-            {rankedRoster.length === 0 ? (
+            {qualifiedRoster.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic">
-                No checked-in players recorded in this session.
+                No qualified players (5+ games) recorded in this session.
               </div>
             ) : (
-              rankedRoster.map((player) => {
-                const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
+              qualifiedRoster.map((player) => {
+                const rawWinRatePercent = Math.round(player.rawWinRate * 100);
+                const bayesWinRatePercent = Math.round(player.bayesianWinRate * 100);
                 const partnerName = getPartnerName(player.partnerId);
 
                 return (
@@ -1292,7 +1325,6 @@ export default function App() {
                         : 'border-gray-200'
                     }`}
                   >
-                    {/* Left Side: Rank, Player Name, Badges */}
                     <div className="flex items-center gap-3.5 min-w-[240px]">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                         player.calculatedRank === 1 
@@ -1309,9 +1341,7 @@ export default function App() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
-                          
                           {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                          
                           <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
                             {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
                           </span>
@@ -1325,23 +1355,21 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Middle: Win Rate Visual Progress Bar */}
                     <div className="w-full md:w-1/3 space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500 font-medium">Win Rate</span>
-                        <span className="font-extrabold text-amber-600">{winRate}%</span>
+                        <span className="text-gray-500 font-medium">Raw Win %</span>
+                        <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
-                            winRate >= 70 ? 'bg-emerald-500' : winRate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                            rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
                           }`}
-                          style={{ width: `${winRate}%` }}
+                          style={{ width: `${rawWinRatePercent}%` }}
                         />
                       </div>
                     </div>
 
-                    {/* Right Side: Detailed Metric Counters */}
                     <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold">
                       <div className="text-center px-2">
                         <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
@@ -1356,13 +1384,13 @@ export default function App() {
                       </div>
 
                       <div className="text-center px-2">
-                        <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
-                        <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Bayes Rating</span>
+                        <span className="text-amber-600 font-bold">{bayesWinRatePercent}%</span>
                       </div>
 
                       <div className="text-center px-2">
-                        <span className="text-[10px] text-gray-400 block uppercase font-bold">Play Time</span>
-                        <span className="text-gray-600 font-mono text-[11px]">{formatDuration(player.timePlayedSec)}</span>
+                        <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
+                        <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
                       </div>
                     </div>
                   </div>
@@ -1370,6 +1398,50 @@ export default function App() {
               })
             )}
           </div>
+
+          {/* UNRANKED / PROVISIONAL PLAYERS IN SUMMARY */}
+          {provisionalRoster.length > 0 && (
+            <div className="pt-4 border-t border-gray-200 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldAlert className="w-5 h-5 text-amber-600" />
+                <h3 className="text-md font-bold text-gray-800 uppercase tracking-wide">
+                  Not Ranked (Provisional - Played &lt; 5 Games)
+                </h3>
+              </div>
+
+              <div className="space-y-2">
+                {provisionalRoster.map((player) => {
+                  const rawWinRatePercent = Math.round(player.rawWinRate * 100);
+                  const partnerName = getPartnerName(player.partnerId);
+
+                  return (
+                    <div
+                      key={player.id}
+                      className="bg-gray-100/60 border border-gray-200 border-dashed rounded-xl p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-extrabold text-gray-900">{player.name}</span>
+                        <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-200 text-gray-700">
+                          {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
+                        </span>
+                        {partnerName && (
+                          <span className="text-[10px] font-semibold text-cyan-700 flex items-center gap-0.5">
+                            <Link className="w-3 h-3" /> Partner: {partnerName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-gray-600 font-medium">
+                        <span>Played: <strong className="text-gray-900">{player.gamesPlayed}</strong></span>
+                        <span>Record: <strong className="text-emerald-600">{player.wins}W</strong> - <strong className="text-rose-600">{player.losses}L</strong></span>
+                        <span>Raw Win Rate: <strong className="text-gray-900">{rawWinRatePercent}%</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-between items-center flex-wrap gap-4 pt-2">
             <button
@@ -1883,24 +1955,15 @@ export default function App() {
         {/* LEADERBOARD & MATCH HISTORY */}
         <div className="flex flex-col gap-8 pt-6 border-t border-gray-200">
           
-          {/* ROW 1: ENHANCED INTERACTIVE LEADERBOARD */}
+          {/* ROW 1: BAYESIAN RANKED STANDINGS */}
           <div className="w-full space-y-6">
             
-            {/* TOP 3 PODIUM DISPLAY */}
-            {podiumData.hasPodium && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
-                {renderPodiumStep(podiumData.rank2, 2)}
-                {renderPodiumStep(podiumData.rank1, 1)}
-                {renderPodiumStep(podiumData.rank3, 3)}
-              </div>
-            )}
-
             {/* LEADERBOARD CONTROLS & HEADER */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
                 <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
-                  Live Standings
+                  LeaderBoard
                 </h2>
                 <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-xl">
                   {filteredLeaderboard.length} Players
@@ -1941,6 +2004,15 @@ export default function App() {
               </div>
             </div>
 
+            {/* TOP 3 PODIUM DISPLAY DIRECTLY IN LEADERBOARD */}
+            {podiumData.hasPodium && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                {renderPodiumStep(podiumData.rank2, 2)}
+                {renderPodiumStep(podiumData.rank1, 1)}
+                {renderPodiumStep(podiumData.rank3, 3)}
+              </div>
+            )}
+
             {/* LEADERBOARD LIST */}
             <div className="space-y-3">
               {filteredLeaderboard.length === 0 ? (
@@ -1949,7 +2021,8 @@ export default function App() {
                 </div>
               ) : (
                 filteredLeaderboard.map((player) => {
-                  const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
+                  const rawWinRatePercent = Math.round(player.rawWinRate * 100);
+                  const bayesWinRatePercent = Math.round(player.bayesianWinRate * 100);
                   const partnerName = getPartnerName(player.partnerId);
 
                   return (
@@ -1981,9 +2054,8 @@ export default function App() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-extrabold text-sm text-gray-900">{player.name}</span>
-                            
                             {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                            
+
                             <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
                               {queueMode === 'dependent' ? `Court ${player.assignedCourt || 1}` : `Lvl ${player.level}`}
                             </span>
@@ -1999,15 +2071,15 @@ export default function App() {
 
                       <div className="w-full md:w-1/3 space-y-1.5">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500 font-medium">Win Rate</span>
-                          <span className="font-extrabold text-amber-600">{winRate}%</span>
+                          <span className="text-gray-500 font-medium">Raw Win %</span>
+                          <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              winRate >= 70 ? 'bg-emerald-500' : winRate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                              rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
                             }`}
-                            style={{ width: `${winRate}%` }}
+                            style={{ width: `${rawWinRatePercent}%` }}
                           />
                         </div>
                       </div>
@@ -2026,13 +2098,13 @@ export default function App() {
                         </div>
 
                         <div className="text-center px-2">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
-                          <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Bayes Rating</span>
+                          <span className="text-amber-600 font-bold">{bayesWinRatePercent}%</span>
                         </div>
 
                         <div className="text-center px-2">
-                          <span className="text-[10px] text-gray-400 block uppercase font-bold">Play Time</span>
-                          <span className="text-gray-600 font-mono text-[11px]">{formatDuration(player.timePlayedSec)}</span>
+                          <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
+                          <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
                         </div>
                       </div>
                     </div>
