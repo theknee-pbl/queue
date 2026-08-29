@@ -1277,7 +1277,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* TOP 3 PODIUM DISPLAY IN SUMMARY */}
           {podiumData.hasPodium && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {renderPodiumStep(podiumData.rank2, 2)}
@@ -1286,7 +1285,6 @@ export default function App() {
             </div>
           )}
 
-          {/* SUMMARY LIST DISPLAY: QUALIFIED PLAYERS */}
           <div className="space-y-3 mb-6">
             {qualifiedRoster.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic">
@@ -1384,7 +1382,6 @@ export default function App() {
             )}
           </div>
 
-          {/* UNRANKED / PROVISIONAL PLAYERS IN SUMMARY */}
           {provisionalRoster.length > 0 && (
             <div className="pt-4 border-t border-gray-200 mb-6">
               <div className="flex items-center gap-2 mb-3">
@@ -1447,7 +1444,7 @@ export default function App() {
         </section>
       )}
 
-      {/* SETTINGS BAR & TABS */}
+      {/* UPDATE 3: SEPERATED QUEUE MATCH TYPE & COURTS, PLACED ABOVE */}
       <div className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xs">
         <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs w-full md:w-auto overflow-x-auto">
           <button
@@ -1468,7 +1465,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 flex-wrap w-full md:w-auto justify-between md:justify-start">
+        <div className="flex items-center gap-6 flex-wrap w-full md:w-auto justify-between md:justify-end">
           <div className="flex items-center gap-2">
             <GitBranch className="w-4 h-4 text-cyan-600" />
             <label className="text-sm font-semibold text-gray-900">Queue Match Type:</label>
@@ -1503,7 +1500,7 @@ export default function App() {
       {/* MAIN CONTENT CONTAINER */}
       <main className="max-w-7xl mx-auto space-y-8">
         
-        {/* TAB 1: COURTS AND QUEUES */}
+        {/* UPDATE 4 TABLEIZED SECTION: COURTS AND QUEUES */}
         {activeTab === 'courts' && (
           <div className="space-y-8 animate-in fade-in duration-200">
             
@@ -1576,36 +1573,35 @@ export default function App() {
                     return (
                       <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
                         <div>
-                          <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
-                            <div className="flex items-center gap-3">
-                              <div>
-                                {editingCourtId === court.id ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <input
-                                      type="text"
-                                      value={tempCourtName}
-                                      onChange={(e) => setTempCourtName(e.target.value)}
-                                      className="bg-white border border-cyan-500 rounded px-2 py-1 text-xs font-bold text-gray-900 outline-none"
-                                      autoFocus
-                                    />
-                                    <button onClick={() => handleSaveCourtName(court.id)} className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer"><Check className="w-3.5 h-3.5" /></button>
-                                    <button onClick={() => setEditingCourtId(null)} className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-extrabold text-base text-gray-900">{court.name}</span>
-                                    {queueMode === 'independent' && (
-                                      <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">
-                                        Level {court.level}
-                                      </span>
-                                    )}
-                                    <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
-                                  </div>
-                                )}
-                              </div>
+                          {/* UPDATE 1: FIXED LAYOUT WHEN EDITING COURT NAME SO IT DOES NOT OVERLAP OTHER COMPONENTS */}
+                          <div className="flex flex-wrap justify-between items-center gap-2 mb-3 pb-3 border-b border-gray-200">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {editingCourtId === court.id ? (
+                                <div className="flex items-center gap-1.5 w-full">
+                                  <input
+                                    type="text"
+                                    value={tempCourtName}
+                                    onChange={(e) => setTempCourtName(e.target.value)}
+                                    className="bg-white border border-cyan-500 rounded px-2 py-1 text-xs font-bold text-gray-900 outline-none flex-1 min-w-0"
+                                    autoFocus
+                                  />
+                                  <button onClick={() => handleSaveCourtName(court.id)} className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 cursor-pointer shrink-0"><Check className="w-3.5 h-3.5" /></button>
+                                  <button onClick={() => setEditingCourtId(null)} className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer shrink-0"><X className="w-3.5 h-3.5" /></button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-extrabold text-base text-gray-900 truncate">{court.name}</span>
+                                  {queueMode === 'independent' && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded shrink-0">
+                                      Level {court.level}
+                                    </span>
+                                  )}
+                                  <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer shrink-0"><Edit2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                              )}
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 shrink-0">
                               <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-1 rounded">
                                 <Clock className="w-3 h-3 inline text-cyan-600 mr-1" /> {formatDuration(liveElapsedSec)}
                               </span>
@@ -1781,7 +1777,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: PLAYERS ROSTER */}
+        {/* UPDATE 4 TABLEIZED SECTION: PLAYERS ROSTER */}
         {activeTab === 'players' && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
             
@@ -1870,7 +1866,8 @@ export default function App() {
                 {roster.length === 0 ? (
                   <p className="text-center py-6 text-gray-400 text-sm italic">No players added yet.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto pr-1">
+                  /* UPDATE 2: 1 ROW, 1 PLAYER IN THE ROSTER LIST VIEW */
+                  <div className="grid grid-cols-1 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
                     {roster.map((player) => {
                       const isPlaying = activeCourtPlayerIds.has(player.id);
                       const partnerName = getPartnerName(player.partnerId);
@@ -1878,7 +1875,7 @@ export default function App() {
                       return (
                         <div
                           key={player.id}
-                          className={`flex justify-between items-center p-3 rounded-xl border transition ${
+                          className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-3.5 rounded-xl border transition gap-3 ${
                             player.isCheckedIn ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-gray-200'
                           }`}
                         >
@@ -1908,7 +1905,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                             {isPlaying ? (
                               <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg">
                                 On Court
@@ -1939,14 +1936,13 @@ export default function App() {
           </section>
         )}
 
-        {/* LEADERBOARD & MATCH HISTORY */}
+        {/* UPDATE 4 TABLEIZED SECTION: LEADERBOARD & MATCH HISTORY */}
         <div className="flex flex-col gap-8 pt-6 border-t border-gray-200">
           
-          {/* ROW 1: RANKED STANDINGS */}
-          <div className="w-full space-y-6">
+          {/* LEADERBOARD TABLEIZED BLOCK */}
+          <div className="w-full space-y-6 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
             
-            {/* LEADERBOARD CONTROLS & HEADER */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
                 <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
@@ -1957,7 +1953,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* SEARCH & FILTER TOOLS */}
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-48">
                   <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1991,7 +1986,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* TOP 3 PODIUM DISPLAY DIRECTLY IN LEADERBOARD */}
             {podiumData.hasPodium && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
                 {renderPodiumStep(podiumData.rank2, 2)}
@@ -2000,10 +1994,9 @@ export default function App() {
               </div>
             )}
 
-            {/* LEADERBOARD LIST */}
             <div className="space-y-3">
               {filteredLeaderboard.length === 0 ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
+                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
                   No matching players found.
                 </div>
               ) : (
@@ -2100,23 +2093,23 @@ export default function App() {
             </div>
           </div>
 
-          {/* ROW 2: MATCH HISTORY */}
-          <div className="w-full space-y-4">
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
+          {/* MATCH HISTORY TABLEIZED BLOCK */}
+          <div className="w-full space-y-4 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
+            <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-cyan-600" />
                 <h2 className="text-lg font-extrabold text-gray-900 uppercase tracking-wide">
                   Match Logs
                 </h2>
               </div>
-              <span className="text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1 rounded-xl">
+              <span className="text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl">
                 {matchHistory.length} Matches Recorded
               </span>
             </div>
 
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
               {matchHistory.length === 0 ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
+                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic text-sm">
                   No completed matches recorded yet.
                 </div>
               ) : (
