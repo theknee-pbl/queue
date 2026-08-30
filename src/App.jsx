@@ -470,11 +470,11 @@ export default function App() {
 
     if (newPlayers.length > 0) {
       setRoster((prev) => [...prev, ...newPlayers]);
-      alert(`Successfully imported ${newPlayers.length} players!`);
+      alert(`Successfully imported ${newPlayers.length} players![cite: 4]`);
       setShowImportModal(false);
       setImportTextContent('');
     } else {
-      alert("No valid players found to import.");
+      alert("No valid players found to import.[cite: 4]");
     }
   };
 
@@ -628,7 +628,6 @@ export default function App() {
     const selected = [];
     const usedIds = new Set();
 
-    // Partner-First Traversal logic applied universally across all courts or level queueing
     for (const p of queueSource) {
       if (usedIds.has(p.id)) continue;
       
@@ -659,7 +658,6 @@ export default function App() {
     const p2 = selected[2];
     const p3 = selected[3];
 
-    // Team Allocation: Ensures paired partners play alongside each other on the same team
     const isP0P1Partner = p0.partnerId === p1.id;
     const isP2P3Partner = p2.partnerId === p3.id;
 
@@ -712,14 +710,14 @@ export default function App() {
 
   const generateMatchForCourt = (courtId) => {
     if (!sessionActive) {
-      alert("Please click 'Start Session' first!");
+      alert("Please click 'Start Session' first![cite: 4]");
       return;
     }
 
     if (queueMode === 'independent') {
       const candidateMatches = getPrioritizedCandidateMatchesIndependent();
       if (candidateMatches.length === 0) {
-        alert(`No level queue currently has at least 4 checked-in players ready to play.`);
+        alert(`No level queue currently has at least 4 checked-in players ready to play.[cite: 4]`);
         return;
       }
 
@@ -750,13 +748,13 @@ export default function App() {
       const courtDisplayName = targetCourt ? targetCourt.name : `Court 0${courtId}`;
 
       if (courtQueue.length < 4) {
-        alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
+        alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}[cite: 4]`);
         return;
       }
 
       const matchResult = getNextMatchFromQueue(courtQueue);
       if (!matchResult.valid) {
-        alert("Could not pair available players evenly with partner-first traversal.");
+        alert("Could not pair available players evenly with partner-first traversal.[cite: 4]");
         return;
       }
 
@@ -1001,7 +999,7 @@ export default function App() {
   };
 
   const handleResetSession = () => {
-    if (window.confirm("Reset all session data, courts, and queues?")) {
+    if (window.confirm("Reset all session data, courts, and queues?[cite: 4]")) {
       localStorage.clear();
       setSessionActive(false);
       setShowSummaryModal(false);
@@ -1576,15 +1574,16 @@ export default function App() {
               </div>
             )}
 
-            <div className={`grid grid-cols-1 ${queueMode === 'independent' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-8`}>
+            {/* UPDATED STRUCTURAL SECTIONS: Section 1 (Courts) and Section 2 (Level Queues) placed sequentially per requirements[cite: 4] */}
+            <div className="space-y-8">
               
-              {/* ACTIVE COURTS */}
+              {/* SECTION 1: COURTS */}
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Active Courts {queueMode === 'dependent' && <span className="text-xs text-amber-600 font-semibold">(Court 01 is Highest Priority)</span>}
+                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Courts {queueMode === 'dependent' && <span className="text-xs text-amber-600 font-semibold">(Court 01 is Highest Priority)</span>}
                 </h2>
 
-                <div className={`grid grid-cols-1 ${queueMode === 'dependent' ? 'md:grid-cols-2 xl:grid-cols-3' : ''} gap-4`}>
+                <div className={`grid grid-cols-1 ${queueMode === 'dependent' || queueMode === 'independent' ? 'md:grid-cols-2 xl:grid-cols-3' : ''} gap-4`}>
                   {courts.map((court) => {
                     const isOccupied = court.teamA.length > 0 || court.teamB.length > 0;
                     const liveElapsedSec = court.isLive && court.startTime ? Math.max(0, Math.floor((now - court.startTime) / 1000)) : 0;
@@ -1593,8 +1592,9 @@ export default function App() {
                     return (
                       <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
                         <div>
-                          <div className="flex flex-wrap justify-between items-center gap-2 mb-3 pb-3 border-b border-gray-200">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-200">
+                            {/* Row 1: Court Name & Live/Ready Badge */}
+                            <div className="flex justify-between items-center gap-2">
                               {editingCourtId === court.id ? (
                                 <div className="flex items-center gap-1.5 w-full">
                                   <input
@@ -1610,29 +1610,34 @@ export default function App() {
                               ) : (
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-extrabold text-base text-gray-900 truncate">{court.name}</span>
-                                  {queueMode === 'independent' && (
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border shadow-2xs ${getCourtLevelBadgeStyle(court.level)}`}>
-                                      Level {court.level}
-                                    </span>
-                                  )}
                                   <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer shrink-0"><Edit2 className="w-3.5 h-3.5" /></button>
                                 </div>
                               )}
-                            </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-1 rounded">
-                                <Clock className="w-3 h-3 inline text-cyan-600 mr-1" /> {formatDuration(liveElapsedSec)}
-                              </span>
                               {isOccupied ? (
-                                <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                                <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shrink-0">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2.5 py-0.5 rounded-full">
+                                <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2.5 py-0.5 rounded-full shrink-0">
                                   Ready
                                 </span>
                               )}
+                            </div>
+
+                            {/* Row 2: Level Display & Match Timer */}
+                            <div className="flex justify-between items-center">
+                              {queueMode === 'independent' ? (
+                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border shadow-2xs ${getCourtLevelBadgeStyle(court.level)}`}>
+                                  Level {court.level}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Court Priority</span>
+                              )}
+
+                              <span className="text-xs text-gray-500 font-mono bg-white border border-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-cyan-600" /> {formatDuration(liveElapsedSec)}
+                              </span>
                             </div>
                           </div>
 
@@ -1725,66 +1730,69 @@ export default function App() {
                 </div>
               </div>
 
+              {/* SECTION 2: LEVEL QUEUES (AFTER COURTS FOR INDEPENDENT MODE)[cite: 4] */}
               {queueMode === 'independent' && (
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4 border-t border-gray-200">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Layers className="w-5 h-5 text-cyan-600" /> Level Queues (Waiting Lists)
                   </h2>
 
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {Array.from({ length: totalCourtCount }, (_, i) => i + 1).map((lvl) => {
                       const levelQueue = getQueueForLevelIndependent(lvl);
                       return (
-                        <div key={`level-q-${lvl}`} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs">
-                          <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-200">
-                            <span className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
-                              Level {lvl} Queue
-                            </span>
-                            <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${getCourtLevelBadgeStyle(lvl)}`}>
-                              {levelQueue.length} waiting
-                            </span>
-                          </div>
-
-                          {levelQueue.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic py-3 text-center">No players currently in Level {lvl} queue</p>
-                          ) : (
-                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                              {levelQueue.map((player, idx) => (
-                                <div key={player.id} className="flex justify-between items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs">
-                                  <div className="flex items-center gap-2 truncate">
-                                    <span className="font-bold text-gray-400">#{idx + 1}</span>
-                                    <span className="font-bold text-gray-800 truncate flex items-center gap-1">
-                                      {player.name} 
-                                      {player.partnerId && <Link className="w-3 h-3 text-amber-500 shrink-0" title="Has Fixed Partner" />}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded px-1">
-                                      <button 
-                                        onClick={() => handleReorderQueue(player.id, 'up', levelQueue)} 
-                                        disabled={idx === 0} 
-                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
-                                        title="Move Up"
-                                      >
-                                        ▲
-                                      </button>
-                                      <button 
-                                        onClick={() => handleReorderQueue(player.id, 'down', levelQueue)} 
-                                        disabled={idx === levelQueue.length - 1} 
-                                        className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
-                                        title="Move Down"
-                                      >
-                                        ▼
-                                      </button>
-                                    </div>
-                                    <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                      <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
+                        <div key={`level-q-${lvl}`} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-200">
+                              <span className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                                Level {lvl} Queue
+                              </span>
+                              <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${getCourtLevelBadgeStyle(lvl)}`}>
+                                {levelQueue.length} waiting
+                              </span>
                             </div>
-                          )}
+
+                            {levelQueue.length === 0 ? (
+                              <p className="text-xs text-gray-400 italic py-3 text-center">No players currently in Level {lvl} queue</p>
+                            ) : (
+                              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                {levelQueue.map((player, idx) => (
+                                  <div key={player.id} className="flex justify-between items-center px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="font-bold text-gray-400">#{idx + 1}</span>
+                                      <span className="font-bold text-gray-800 truncate flex items-center gap-1">
+                                        {player.name} 
+                                        {player.partnerId && <Link className="w-3 h-3 text-amber-500 shrink-0" title="Has Fixed Partner" />}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded px-1">
+                                        <button 
+                                          onClick={() => handleReorderQueue(player.id, 'up', levelQueue)} 
+                                          disabled={idx === 0} 
+                                          className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
+                                          title="Move Up"
+                                        >
+                                          ▲
+                                        </button>
+                                        <button 
+                                          onClick={() => handleReorderQueue(player.id, 'down', levelQueue)} 
+                                          disabled={idx === levelQueue.length - 1} 
+                                          className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
+                                          title="Move Down"
+                                        >
+                                          ▼
+                                        </button>
+                                      </div>
+                                      <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
