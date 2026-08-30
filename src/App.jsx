@@ -1785,7 +1785,7 @@ export default function App() {
                                         </button>
                                       </div>
                                       <span className="text-[11px] font-mono text-cyan-700 font-semibold bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                        <Clock className="w-3 h-3 text-cyan-500 inline" /> {formatWaitTime(player.checkedInAt)}
+                                        <Trophy className="w-3 h-3 text-cyan-500 inline" /> {player.gamesPlayed}G
                                       </span>
                                     </div>
                                   </div>
