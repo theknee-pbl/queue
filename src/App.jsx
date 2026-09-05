@@ -152,6 +152,10 @@ export default function App() {
     return parseInt(localStorage.getItem('pickleq_court_count') || '3', 10);
   });
 
+  const [totalLevelCount, setTotalLevelCount] = useState(() => {
+    return parseInt(localStorage.getItem('pickleq_level_count') || '3', 10);
+  });
+
   const [sessionActive, setSessionActive] = useState(() => {
     return JSON.parse(localStorage.getItem('pickleq_session_active') || 'false');
   });
@@ -302,6 +306,7 @@ export default function App() {
 
   useEffect(() => localStorage.setItem('pickleq_queue_mode', queueMode), [queueMode]);
   useEffect(() => localStorage.setItem('pickleq_court_count', totalCourtCount.toString()), [totalCourtCount]);
+  useEffect(() => localStorage.setItem('pickleq_level_count', totalLevelCount.toString()), [totalLevelCount]);
   useEffect(() => localStorage.setItem('pickleq_session_active', JSON.stringify(sessionActive)), [sessionActive]);
   useEffect(() => localStorage.setItem('pickleq_courts', JSON.stringify(courts)), [courts]);
   useEffect(() => localStorage.setItem('pickleq_roster', JSON.stringify(roster)), [roster]);
@@ -470,11 +475,11 @@ export default function App() {
 
     if (newPlayers.length > 0) {
       setRoster((prev) => [...prev, ...newPlayers]);
-      alert(`Successfully imported ${newPlayers.length} players![cite: 4]`);
+      alert(`Successfully imported ${newPlayers.length} players!`);
       setShowImportModal(false);
       setImportTextContent('');
     } else {
-      alert("No valid players found to import.[cite: 4]");
+      alert("No valid players found to import.");
     }
   };
 
@@ -684,7 +689,7 @@ export default function App() {
   const getPrioritizedCandidateMatchesIndependent = () => {
     const candidateMatches = [];
 
-    for (let lvl = 1; lvl <= totalCourtCount; lvl++) {
+    for (let lvl = 1; lvl <= totalLevelCount; lvl++) {
       const match = getNextMatchFromQueueIndependent(lvl);
       if (match.valid) {
         const allPlayers = [...match.teamA, ...match.teamB];
@@ -710,14 +715,14 @@ export default function App() {
 
   const generateMatchForCourt = (courtId) => {
     if (!sessionActive) {
-      alert("Please click 'Start Session' first![cite: 4]");
+      alert("Please click 'Start Session' first!");
       return;
     }
 
     if (queueMode === 'independent') {
       const candidateMatches = getPrioritizedCandidateMatchesIndependent();
       if (candidateMatches.length === 0) {
-        alert(`No level queue currently has at least 4 checked-in players ready to play.[cite: 4]`);
+        alert(`No level queue currently has at least 4 checked-in players ready to play.`);
         return;
       }
 
@@ -748,13 +753,13 @@ export default function App() {
       const courtDisplayName = targetCourt ? targetCourt.name : `Court 0${courtId}`;
 
       if (courtQueue.length < 4) {
-        alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}[cite: 4]`);
+        alert(`${courtDisplayName} needs at least 4 checked-in players. Available: ${courtQueue.length}`);
         return;
       }
 
       const matchResult = getNextMatchFromQueue(courtQueue);
       if (!matchResult.valid) {
-        alert("Could not pair available players evenly with partner-first traversal.[cite: 4]");
+        alert("Could not pair available players evenly with partner-first traversal.");
         return;
       }
 
@@ -792,7 +797,7 @@ export default function App() {
       if (queueMode === 'independent') {
         const calculateNewLevel = (currentLevel, isWinner) => {
           if (isWinner) {
-            return currentLevel < totalCourtCount ? currentLevel + 1 : currentLevel;
+            return currentLevel < totalLevelCount ? currentLevel + 1 : currentLevel;
           } else {
             return currentLevel > 1 ? currentLevel - 1 : 1;
           }
@@ -960,7 +965,7 @@ export default function App() {
 
         if (queueMode === 'independent') {
           if (isNowWinner) {
-            updatedLevel = matchLevel < totalCourtCount ? matchLevel + 1 : matchLevel;
+            updatedLevel = matchLevel < totalLevelCount ? matchLevel + 1 : matchLevel;
           } else {
             updatedLevel = matchLevel > 1 ? matchLevel - 1 : 1;
           }
@@ -999,7 +1004,7 @@ export default function App() {
   };
 
   const handleResetSession = () => {
-    if (window.confirm("Reset all session data, courts, and queues?[cite: 4]")) {
+    if (window.confirm("Reset all session data, courts, and queues?")) {
       localStorage.clear();
       setSessionActive(false);
       setShowSummaryModal(false);
@@ -1476,6 +1481,24 @@ export default function App() {
               ))}
             </select>
           </div>
+
+          {queueMode === 'independent' && (
+            <div className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-cyan-600" />
+              <label className="text-xs font-semibold text-gray-900">Levels:</label>
+              <select
+                value={totalLevelCount}
+                onChange={(e) => setTotalLevelCount(parseInt(e.target.value, 10))}
+                className="bg-white border border-gray-200 text-cyan-700 font-bold rounded-lg px-2 py-1 text-xs outline-none cursor-pointer focus:border-cyan-500 shadow-2xs"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <option key={num} value={num}>
+                    {num} {num === 1 ? 'Level' : 'Levels'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1574,7 +1597,7 @@ export default function App() {
               </div>
             )}
 
-            {/* UPDATED STRUCTURAL SECTIONS: Section 1 (Courts) and Section 2 (Level Queues) placed sequentially per requirements[cite: 4] */}
+            {/* UPDATED STRUCTURAL SECTIONS: Section 1 (Courts) and Section 2 (Level Queues) placed sequentially per requirements */}
             <div className="space-y-8">
               
               {/* SECTION 1: COURTS */}
@@ -1730,7 +1753,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SECTION 2: LEVEL QUEUES (AFTER COURTS FOR INDEPENDENT MODE)[cite: 4] */}
+              {/* SECTION 2: LEVEL QUEUES (AFTER COURTS FOR INDEPENDENT MODE) */}
               {queueMode === 'independent' && (
                 <div className="space-y-4 pt-4 border-t border-gray-200">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -1738,7 +1761,7 @@ export default function App() {
                   </h2>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {Array.from({ length: totalCourtCount }, (_, i) => i + 1).map((lvl) => {
+                    {Array.from({ length: totalLevelCount }, (_, i) => i + 1).map((lvl) => {
                       const levelQueue = getQueueForLevelIndependent(lvl);
                       return (
                         <div key={`level-q-${lvl}`} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
