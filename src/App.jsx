@@ -604,19 +604,37 @@ export default function App() {
   }, [totalCourtCount, sessionActive, queueMode]);
 
   const getQueueForCourtDependent = (courtId) => {
-    return checkedInQueue
-      .filter((player) => {
-        if (player.gamesPlayed === 0) return true;
-        return player.assignedCourt === courtId;
-      })
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
-  };
+  return checkedInQueue
+    .filter((player) => {
+      if (player.gamesPlayed === 0) return true;
+      return player.assignedCourt === courtId;
+    })
+    .sort((a, b) => {
+      // Primary sort: Checked-in time (earlier time first)
+      const timeA = a.checkedInAt || Date.now();
+      const timeB = b.checkedInAt || Date.now();
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      // Secondary sort: Higher rank/wins first if time is identical
+      return (b.wins || 0) - (a.wins || 0);
+    });
+};
 
   const getQueueForLevelIndependent = (levelNum) => {
-    return roster
-      .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-      .sort((a, b) => (a.checkedInAt || 0) - (b.checkedInAt || 0));
-  };
+  return roster
+    .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
+    .sort((a, b) => {
+      // Primary sort: Checked-in time (earlier time first)
+      const timeA = a.checkedInAt || Date.now();
+      const timeB = b.checkedInAt || Date.now();
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      // Secondary sort: Higher rank/wins first if time is identical
+      return (b.wins || 0) - (a.wins || 0);
+    });
+};
 
   const formatWaitTime = (checkedInAt) => {
     if (!checkedInAt) return '0m 0s';
