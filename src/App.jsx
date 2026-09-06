@@ -1925,26 +1925,91 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
+            {/* CHECKED-IN PLAYERS SUB-SECTION (1 ROW PER PLAYER) */}
+            <div className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-amber-500" /> Roster ({roster.length})
+                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-emerald-600" /> Checked-In Players ({roster.filter(p => p.isCheckedIn).length})
                 </h2>
 
-                {roster.length === 0 ? (
-                  <p className="text-center py-6 text-gray-400 text-sm italic">No players added yet.</p>
+                {roster.filter(p => p.isCheckedIn).length === 0 ? (
+                  <p className="text-center py-4 text-gray-400 text-xs italic">No players currently checked in.</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
-                    {roster.map((player) => {
+                  <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                    {roster.filter(p => p.isCheckedIn).map((player) => {
                       const isPlaying = activeCourtPlayerIds.has(player.id);
                       const partnerName = getPartnerName(player.partnerId);
 
                       return (
                         <div
                           key={player.id}
-                          className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-3.5 rounded-xl border transition gap-3 ${
-                            player.isCheckedIn ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-gray-200'
-                          }`}
+                          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border bg-white border-emerald-200 shadow-2xs gap-3"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-gray-900">{player.name}</span>
+                              {partnerName && (
+                                <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                  <Link className="w-3 h-3" /> Partner: {partnerName}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">
+                              W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | Level: {player.level}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            {isPlaying ? (
+                              <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg">
+                                On Court
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-cyan-700 font-mono bg-cyan-50 px-2 py-1 rounded-lg border border-cyan-100">
+                                Wait: {formatWaitTime(player.checkedInAt)}
+                              </span>
+                            )}
+
+                            {!isPlaying && (
+                              <button
+                                onClick={() => handleToggleCheckIn(player.id)}
+                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                title="Check Out to Roster"
+                              >
+                                <UserX className="w-3.5 h-3.5" /> Check Out
+                              </button>
+                            )}
+
+                            <button onClick={() => handleRemoveFromRoster(player.id)} className="p-1 text-gray-400 hover:text-rose-600 transition cursor-pointer">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* GENERAL / CHECKED-OUT ROSTER SECTION (EXCLUDES CHECKED-IN PLAYERS) */}
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-amber-500" /> Full Roster Pool ({roster.filter(p => !p.isCheckedIn).length} Available)
+                </h2>
+
+                {roster.filter(p => !p.isCheckedIn).length === 0 ? (
+                  <p className="text-center py-6 text-gray-400 text-sm italic">All players are currently checked in.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
+                    {roster.filter(p => !p.isCheckedIn).map((player) => {
+                      const partnerName = getPartnerName(player.partnerId);
+
+                      return (
+                        <div
+                          key={player.id}
+                          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3.5 rounded-xl border bg-white border-gray-200 transition gap-3"
                         >
                           <div>
                             <div className="flex items-center gap-2">
@@ -1964,29 +2029,16 @@ export default function App() {
 
                             <div className="text-[10px] text-gray-500 mt-0.5">
                               W/L: <span className="text-emerald-600 font-bold">{player.wins}W</span>-<span className="text-rose-600 font-bold">{player.losses}L</span> | Level: {player.level}
-                              {player.isCheckedIn && !isPlaying && (
-                                <span className="text-cyan-700 font-mono font-bold ml-1">
-                                  ({formatWaitTime(player.checkedInAt)})
-                                </span>
-                              )}
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                            {isPlaying ? (
-                              <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg">
-                                On Court
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleToggleCheckIn(player.id)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                                  player.isCheckedIn ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                                }`}
-                              >
-                                {player.isCheckedIn ? <><UserX className="w-3.5 h-3.5" /> Check Out</> : <><UserCheck className="w-3.5 h-3.5" /> Check In</>}
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleToggleCheckIn(player.id)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer bg-emerald-600 text-white hover:bg-emerald-500"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" /> Check In
+                            </button>
 
                             <button onClick={() => handleRemoveFromRoster(player.id)} className="p-1 text-gray-400 hover:text-rose-600 transition cursor-pointer">
                               <Trash2 className="w-4 h-4" />
