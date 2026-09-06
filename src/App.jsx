@@ -1635,9 +1635,9 @@ export default function App() {
                         <div>
                           <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-200">
                             {/* Row 1: Court Name & Live/Ready Badge */}
-                            <div className="flex justify-between items-center gap-2">
+                            <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
                               {editingCourtId === court.id ? (
-                                <div className="flex items-center gap-1.5 w-full">
+                                <div className="flex items-center gap-1.5 w-full sm:w-auto flex-1 min-w-[200px]">
                                   <input
                                     type="text"
                                     value={tempCourtName}
@@ -1649,18 +1649,18 @@ export default function App() {
                                   <button onClick={() => setEditingCourtId(null)} className="p-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 cursor-pointer shrink-0"><X className="w-3.5 h-3.5" /></button>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
                                   <span className="font-extrabold text-base text-gray-900 truncate">{court.name}</span>
                                   <button onClick={() => { setEditingCourtId(court.id); setTempCourtName(court.name); }} className="text-gray-400 hover:text-cyan-600 cursor-pointer shrink-0"><Edit2 className="w-3.5 h-3.5" /></button>
                                 </div>
                               )}
 
                               {isOccupied ? (
-                                <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shrink-0">
+                                <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shrink-0 ml-auto">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-[11px] text-gray-600 font-medium bg-gray-200 border border-gray-300 px-2.5 py-0.5 rounded-full shrink-0 ml-auto">
                                   Ready
                                 </span>
                               )}
