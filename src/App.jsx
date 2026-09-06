@@ -33,7 +33,9 @@ import {
   Filter,
   Search,
   Activity,
-  ShieldAlert
+  ShieldAlert,
+  Lock,
+  User
 } from 'lucide-react';
 
 // --- DYNAMIC COURT / LEVEL BADGE COLOR HELPER ---
@@ -111,21 +113,13 @@ const calculateAdvancedPlayerMetrics = (player) => {
   const games = player.gamesPlayed || 0;
   const wins = player.wins || 0;
   
-  // Bayesian Average Parameters
-  const m = 5; // Pseudo-games weight
-  const mu = 0.50; // Global target win rate baseline (50%)
+  const m = 5; 
+  const mu = 0.50; 
   
-  // 1. Bayesian Adjusted Win Rate
   const bayesianWinRate = (wins + (m * mu)) / (games + m);
-
-  // 2. Active Participation Multiplier: 1 - e^(-k * Games)
   const k = 0.2; 
   const participationMultiplier = 1 - Math.exp(-k * games);
-
-  // 3. Final Score
   const finalScore = bayesianWinRate * participationMultiplier;
-
-  // 4. Minimum Game Threshold Qualifier Flag
   const MIN_GAMES_THRESHOLD = 5;
   const isQualified = games >= MIN_GAMES_THRESHOLD;
 
@@ -138,11 +132,23 @@ const calculateAdvancedPlayerMetrics = (player) => {
 };
 
 export default function App() {
+  // --- AUTHENTICATION STATE ---
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return JSON.parse(localStorage.getItem('pickleq_is_logged_in') || 'false');
+  });
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState('courts'); 
   const [now, setNow] = useState(Date.now()); 
   const [leaderboardFilter, setLeaderboardFilter] = useState('all');
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
+
+  // --- NEW SEARCH STATES FOR ROSTER SECTIONS ---
+  const [checkedInSearch, setCheckedInSearch] = useState('');
+  const [poolSearch, setPoolSearch] = useState('');
 
   const [queueMode, setQueueMode] = useState(() => {
     return localStorage.getItem('pickleq_queue_mode') || 'independent';
@@ -210,7 +216,26 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
-  // --- ADVANCED RANKING HOOK WITH BAYESIAN SMOOTHING & PROVISIONAL TIER ---
+  // --- AUTH HANDLER ---
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setLoginError('');
+
+    if (loginUsername.trim() === 'admin' && loginPassword === 'pbl2026') {
+      setIsLoggedIn(true);
+      localStorage.setItem('pickleq_is_logged_in', 'true');
+    } else {
+      setLoginError('Invalid username or password.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('pickleq_is_logged_in');
+    setLoginPassword('');
+  };
+
+  // --- ADVANCED RANKING HOOK ---
   const rankedRoster = useMemo(() => {
     const getHeadToHeadWinner = (playerA, playerB) => {
       if (!playerA.headToHead || !playerB.headToHead) return 0;
@@ -238,23 +263,17 @@ export default function App() {
         const courtA = a.assignedCourt || totalCourtCount;
         const courtB = b.assignedCourt || totalCourtCount;
         if (courtA !== courtB) return courtA - courtB;
-
         if (a.finalScore !== b.finalScore) return b.finalScore - a.finalScore;
-
         const sosA = a.scheduleStrength || 0;
         const sosB = b.scheduleStrength || 0;
         if (sosA !== sosB) return sosB - sosA;
-
         return getHeadToHeadWinner(a, b);
       } else {
         if (b.level !== a.level) return b.level - a.level;
-
         if (a.finalScore !== b.finalScore) return b.finalScore - a.finalScore;
-
         const sosA = a.scheduleStrength || 0;
         const sosB = b.scheduleStrength || 0;
         if (sosA !== sosB) return sosB - sosA;
-
         return getHeadToHeadWinner(a, b);
       }
     });
@@ -604,37 +623,29 @@ export default function App() {
   }, [totalCourtCount, sessionActive, queueMode]);
 
   const getQueueForCourtDependent = (courtId) => {
-  return checkedInQueue
-    .filter((player) => {
-      if (player.gamesPlayed === 0) return true;
-      return player.assignedCourt === courtId;
-    })
-    .sort((a, b) => {
-      // Primary sort: Checked-in time (earlier time first)
-      const timeA = a.checkedInAt || Date.now();
-      const timeB = b.checkedInAt || Date.now();
-      if (timeA !== timeB) {
-        return timeA - timeB;
-      }
-      // Secondary sort: Higher rank/wins first if time is identical
-      return (b.wins || 0) - (a.wins || 0);
-    });
-};
+    return checkedInQueue
+      .filter((player) => {
+        if (player.gamesPlayed === 0) return true;
+        return player.assignedCourt === courtId;
+      })
+      .sort((a, b) => {
+        const timeA = a.checkedInAt || Date.now();
+        const timeB = b.checkedInAt || Date.now();
+        if (timeA !== timeB) return timeA - timeB;
+        return (b.wins || 0) - (a.wins || 0);
+      });
+  };
 
   const getQueueForLevelIndependent = (levelNum) => {
-  return roster
-    .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
-    .sort((a, b) => {
-      // Primary sort: Checked-in time (earlier time first)
-      const timeA = a.checkedInAt || Date.now();
-      const timeB = b.checkedInAt || Date.now();
-      if (timeA !== timeB) {
-        return timeA - timeB;
-      }
-      // Secondary sort: Higher rank/wins first if time is identical
-      return (b.wins || 0) - (a.wins || 0);
-    });
-};
+    return roster
+      .filter((p) => p.isCheckedIn && !activeCourtPlayerIds.has(p.id) && p.level === levelNum)
+      .sort((a, b) => {
+        const timeA = a.checkedInAt || Date.now();
+        const timeB = b.checkedInAt || Date.now();
+        if (timeA !== timeB) return timeA - timeB;
+        return (b.wins || 0) - (a.wins || 0);
+      });
+  };
 
   const formatWaitTime = (checkedInAt) => {
     if (!checkedInAt) return '0m 0s';
@@ -644,7 +655,6 @@ export default function App() {
     return `${mins}m ${secs}s`;
   };
 
-  // --- UPDATED MATCH SELECTION WITH PARTNER-FIRST TRAVERSAL & TEAM ALLOCATION ---
   const getNextMatchFromQueue = (queueSource) => {
     if (queueSource.length < 4) return { teamA: [], teamB: [], valid: false };
 
@@ -1024,6 +1034,7 @@ export default function App() {
   const handleResetSession = () => {
     if (window.confirm("Reset all session data, courts, and queues?")) {
       localStorage.clear();
+      setIsLoggedIn(false);
       setSessionActive(false);
       setShowSummaryModal(false);
       setCourts(Array.from({ length: totalCourtCount }, (_, i) => ({ 
@@ -1052,7 +1063,6 @@ export default function App() {
     return partner ? partner.name : null;
   };
 
-  // --- PODIUM RENDER HELPER ---
   const renderPodiumStep = (players, rankNum) => {
     if (!players || players.length === 0) return null;
 
@@ -1146,6 +1156,75 @@ export default function App() {
     }
   };
 
+  // --- RENDER LOGIN SCREEN IF NOT AUTHENTICATED ---
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans antialiased">
+        <div className="bg-white border border-gray-200 rounded-3xl max-w-md w-full p-8 shadow-xl relative">
+          <div className="flex flex-col items-center text-center mb-6">
+            <PBLLogo className="w-20 h-20 mb-3 shadow-sm" />
+            <h1 className="text-2xl font-extrabold tracking-wider text-gray-900 uppercase">
+              PBL Queueing System
+            </h1>
+            <p className="text-gray-500 text-xs mt-1">
+              Please sign in to access the courts & queues.
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            {loginError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold p-3 rounded-xl text-center">
+                {loginError}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Username</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Enter username"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-cyan-500 rounded-xl pl-10 pr-3.5 py-3 text-sm text-gray-900 outline-none transition"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  placeholder="Enter password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-cyan-500 rounded-xl pl-10 pr-3.5 py-3 text-sm text-gray-900 outline-none transition"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full mt-2 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold rounded-xl text-sm transition cursor-pointer shadow-md shadow-cyan-900/10 flex items-center justify-center gap-2"
+            >
+              <Play className="w-4 h-4 fill-current" /> Sign In to System
+            </button>
+          </form>
+
+          <div className="mt-6 text-center border-t border-gray-100 pt-4 text-[11px] text-gray-400">
+            Demo Credentials — Username: <span className="font-bold text-gray-600">admin</span> | Password: <span className="font-bold text-gray-600">pbl2026</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN APP DASHBOARD (AUTHENTICATED) ---
   return (
     <div className="min-h-screen bg-white text-gray-900 p-4 md:p-8 font-sans antialiased">
       {/* HEADER */}
@@ -1185,6 +1264,14 @@ export default function App() {
               <div className="text-base font-bold text-gray-900">{totalMatches}</div>
             </div>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="p-2.5 bg-gray-50 hover:bg-amber-50 text-gray-600 hover:text-amber-600 border border-gray-200 hover:border-amber-200 rounded-xl transition cursor-pointer"
+            title="Log Out"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
 
           <button
             onClick={handleResetSession}
@@ -1325,7 +1412,6 @@ export default function App() {
                             : 'border-gray-200'
                         }`}
                       >
-                        {/* Col 1: Rank & Name */}
                         <div className="flex items-center gap-3.5 md:col-span-1">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                             player.calculatedRank === 1 
@@ -1353,14 +1439,12 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Col 2: Court / Level */}
                         <div className="flex items-center md:justify-center">
                           <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
                             {courtOrLevelVal}
                           </span>
                         </div>
 
-                        {/* Col 3: Raw Win % */}
                         <div className="space-y-1.5 md:col-span-1">
                           <div className="flex justify-between items-center text-xs">
                             <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
@@ -1375,7 +1459,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Col 4 & 5: Stats */}
                         <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
                           <div className="px-1">
                             <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
@@ -1468,7 +1551,7 @@ export default function App() {
         </section>
       )}
 
-      {/* SEPARATED SYSTEM SETTINGS */}
+      {/* SYSTEM SETTINGS */}
       <div className="max-w-7xl mx-auto mb-4 bg-white border border-gray-200 rounded-2xl p-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-end">
           <div className="flex items-center gap-1.5">
@@ -1615,10 +1698,7 @@ export default function App() {
               </div>
             )}
 
-            {/* UPDATED STRUCTURAL SECTIONS: Section 1 (Courts) and Section 2 (Level Queues) placed sequentially per requirements */}
             <div className="space-y-8">
-              
-              {/* SECTION 1: COURTS */}
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Courts {queueMode === 'dependent' && <span className="text-xs text-amber-600 font-semibold">(Court 01 is Highest Priority)</span>}
@@ -1634,7 +1714,6 @@ export default function App() {
                       <div key={court.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
                         <div>
                           <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-200">
-                            {/* Row 1: Court Name & Live/Ready Badge */}
                             <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
                               {editingCourtId === court.id ? (
                                 <div className="flex items-center gap-1.5 w-full sm:w-auto flex-1 min-w-[200px]">
@@ -1666,7 +1745,6 @@ export default function App() {
                               )}
                             </div>
 
-                            {/* Row 2: Level Display & Match Timer */}
                             <div className="flex justify-between items-center">
                               {queueMode === 'independent' ? (
                                 <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border shadow-2xs ${getCourtLevelBadgeStyle(court.level)}`}>
@@ -1745,7 +1823,6 @@ export default function App() {
                                         onClick={() => handleReorderQueue(p.id, 'up', courtQueue)} 
                                         disabled={idx === 0} 
                                         className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1"
-                                        title="Move Up"
                                       >
                                         ▲
                                       </button>
@@ -1753,7 +1830,6 @@ export default function App() {
                                         onClick={() => handleReorderQueue(p.id, 'down', courtQueue)} 
                                         disabled={idx === courtQueue.length - 1} 
                                         className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1"
-                                        title="Move Down"
                                       >
                                         ▼
                                       </button>
@@ -1771,7 +1847,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SECTION 2: LEVEL QUEUES (AFTER COURTS FOR INDEPENDENT MODE) */}
               {queueMode === 'independent' && (
                 <div className="space-y-4 pt-4 border-t border-gray-200">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -1812,7 +1887,6 @@ export default function App() {
                                           onClick={() => handleReorderQueue(player.id, 'up', levelQueue)} 
                                           disabled={idx === 0} 
                                           className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
-                                          title="Move Up"
                                         >
                                           ▲
                                         </button>
@@ -1820,7 +1894,6 @@ export default function App() {
                                           onClick={() => handleReorderQueue(player.id, 'down', levelQueue)} 
                                           disabled={idx === levelQueue.length - 1} 
                                           className="text-gray-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer font-bold px-1 text-[11px]"
-                                          title="Move Down"
                                         >
                                           ▼
                                         </button>
@@ -1840,7 +1913,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         )}
@@ -1848,7 +1920,6 @@ export default function App() {
         {/* TAB 2: PLAYERS ROSTER */}
         {activeTab === 'players' && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
-            
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs">
               <div>
                 <div className="flex justify-between items-center mb-4">
@@ -1925,18 +1996,29 @@ export default function App() {
               </div>
             </div>
 
-            {/* CHECKED-IN PLAYERS SUB-SECTION (1 ROW PER PLAYER) */}
             <div className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-emerald-600" /> Checked-In Players ({roster.filter(p => p.isCheckedIn).length})
-                </h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-emerald-600" /> Checked-In Players ({roster.filter(p => p.isCheckedIn).length})
+                  </h2>
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search checked-in..."
+                      value={checkedInSearch}
+                      onChange={(e) => setCheckedInSearch(e.target.value)}
+                      className="w-full bg-white border border-emerald-200 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 outline-none"
+                    />
+                  </div>
+                </div>
 
-                {roster.filter(p => p.isCheckedIn).length === 0 ? (
-                  <p className="text-center py-4 text-gray-400 text-xs italic">No players currently checked in.</p>
+                {roster.filter(p => p.isCheckedIn && p.name.toLowerCase().includes(checkedInSearch.toLowerCase())).length === 0 ? (
+                  <p className="text-center py-4 text-gray-400 text-xs italic">No matching checked-in players found.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
-                    {roster.filter(p => p.isCheckedIn).map((player) => {
+                    {roster.filter(p => p.isCheckedIn && p.name.toLowerCase().includes(checkedInSearch.toLowerCase())).map((player) => {
                       const isPlaying = activeCourtPlayerIds.has(player.id);
                       const partnerName = getPartnerName(player.partnerId);
 
@@ -1974,7 +2056,6 @@ export default function App() {
                               <button
                                 onClick={() => handleToggleCheckIn(player.id)}
                                 className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                                title="Check Out to Roster"
                               >
                                 <UserX className="w-3.5 h-3.5" /> Check Out
                               </button>
@@ -1992,18 +2073,29 @@ export default function App() {
               </div>
             </div>
 
-            {/* GENERAL / CHECKED-OUT ROSTER SECTION (EXCLUDES CHECKED-IN PLAYERS) */}
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col justify-between shadow-2xs md:col-span-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-amber-500" /> Full Roster Pool ({roster.filter(p => !p.isCheckedIn).length} Available)
-                </h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-500" /> Full Roster Pool ({roster.filter(p => !p.isCheckedIn).length} Available)
+                  </h2>
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search roster pool..."
+                      value={poolSearch}
+                      onChange={(e) => setPoolSearch(e.target.value)}
+                      className="w-full bg-white border border-gray-200 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 outline-none"
+                    />
+                  </div>
+                </div>
 
-                {roster.filter(p => !p.isCheckedIn).length === 0 ? (
-                  <p className="text-center py-6 text-gray-400 text-sm italic">All players are currently checked in.</p>
+                {roster.filter(p => !p.isCheckedIn && p.name.toLowerCase().includes(poolSearch.toLowerCase())).length === 0 ? (
+                  <p className="text-center py-6 text-gray-400 text-sm italic">No matching available players found.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-2.5 max-h-[400px] overflow-y-auto pr-1">
-                    {roster.filter(p => !p.isCheckedIn).map((player) => {
+                    {roster.filter(p => !p.isCheckedIn && p.name.toLowerCase().includes(poolSearch.toLowerCase())).map((player) => {
                       const partnerName = getPartnerName(player.partnerId);
 
                       return (
@@ -2051,16 +2143,13 @@ export default function App() {
                 )}
               </div>
             </div>
-
           </section>
         )}
 
         {/* TAB 3: LEADERBOARD */}
         {activeTab === 'leaderboard' && (
           <div className="flex flex-col gap-8 animate-in fade-in duration-200">
-            
             <div className="w-full space-y-6 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
-              
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-2xl p-4 gap-3 shadow-2xs">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-amber-500" />
@@ -2146,7 +2235,6 @@ export default function App() {
                                 : 'border-gray-200'
                             }`}
                           >
-                            {/* Col 1: Rank & Name */}
                             <div className="flex items-center gap-3.5 md:col-span-1">
                               <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                                 player.calculatedRank === 1 
@@ -2174,14 +2262,12 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Col 2: Court / Level */}
                             <div className="flex items-center md:justify-center">
                               <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
                                 {courtOrLevelVal}
                               </span>
                             </div>
 
-                            {/* Col 3: Raw Win % */}
                             <div className="space-y-1.5 md:col-span-1">
                               <div className="flex justify-between items-center text-xs">
                                 <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
@@ -2196,7 +2282,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Col 4 & 5: Stats */}
                             <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
                               <div className="px-1">
                                 <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
@@ -2228,14 +2313,12 @@ export default function App() {
                 )}
               </div>
             </div>
-
           </div>
         )}
 
         {/* TAB 4: MATCH LOGS */}
         {activeTab === 'matchLogs' && (
           <div className="flex flex-col gap-8 animate-in fade-in duration-200">
-            
             <div className="w-full space-y-4 bg-gray-50/50 border border-gray-200 rounded-3xl p-5 md:p-6 shadow-2xs">
               <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex-wrap gap-3">
                 <div className="flex items-center gap-2">
@@ -2299,7 +2382,6 @@ export default function App() {
                 )}
               </div>
             </div>
-
           </div>
         )}
 
