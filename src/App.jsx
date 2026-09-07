@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { toPng } from 'html-to-image'; // <--- Import html-to-image
 import { 
   Trophy, 
   Users, 
@@ -36,8 +35,7 @@ import {
   Activity,
   ShieldAlert,
   Lock,
-  User,
-  Download // <--- Import Download icon
+  User
 } from 'lucide-react';
 
 // --- DYNAMIC COURT / LEVEL BADGE COLOR HELPER ---
@@ -217,23 +215,6 @@ export default function App() {
   });
 
   const fileInputRef = useRef(null);
-  const summaryRef = useRef(null); // <--- Ref reference for the summary modal card capture
-
-  // --- IMAGE GENERATION HANDLER ---
-  const handleDownloadSummaryImage = async () => {
-    if (summaryRef.current) {
-      try {
-        const dataUrl = await toPng(summaryRef.current, { cacheBust: true, backgroundColor: '#ffffff' });
-        const link = document.createElement('a');
-        link.download = `pbl-session-summary-${Date.now()}.png`;
-        link.href = dataUrl;
-        link.click();
-      } catch (err) {
-        console.error('Failed to generate summary image:', err);
-        alert('Could not generate image. Please try again.');
-      }
-    }
-  };
 
   // --- AUTH HANDLER ---
   const handleLogin = (e) => {
@@ -1373,180 +1354,133 @@ export default function App() {
         <section className="max-w-7xl mx-auto mb-8 bg-gray-50 border border-amber-500/40 rounded-3xl p-6 md:p-8 shadow-xl relative animate-in fade-in slide-in-from-top-4 duration-300">
           <button
             onClick={() => setShowSummaryModal(false)}
-            className="absolute top-5 right-5 p-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full transition cursor-pointer z-10"
+            className="absolute top-5 right-5 p-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
-          {/* WRAPPER REF FOR CAPTURING THE SUMMARY IMAGE */}
-          <div ref={summaryRef} className="bg-white p-6 rounded-2xl border border-gray-100 space-y-6">
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                <Trophy className="w-7 h-7 text-amber-500" />
-                <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
-                  Session Final Summary
-                </h2>
-              </div>
-              <p className="text-gray-500 text-xs mt-1">
-                Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Ranked Players: <span className="text-cyan-600 font-bold">{qualifiedRoster.length}</span>
-              </p>
+          <div className="mb-6">
+            <div className="flex items-center gap-3">
+              <Trophy className="w-7 h-7 text-amber-500" />
+              <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-wide uppercase">
+                Session Final Summary
+              </h2>
             </div>
+            <p className="text-gray-500 text-xs mt-1">
+              Completed Matches: <span className="text-amber-600 font-bold">{totalMatches}</span> | Ranked Players: <span className="text-cyan-600 font-bold">{qualifiedRoster.length}</span>
+            </p>
+          </div>
 
-            {podiumData.hasPodium && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {renderPodiumStep(podiumData.rank2, 2)}
-                {renderPodiumStep(podiumData.rank1, 1)}
-                {renderPodiumStep(podiumData.rank3, 3)}
-              </div>
-            )}
-
-            <div className="space-y-3 mb-6">
-              {qualifiedRoster.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic">
-                  No qualified players (5+ games) recorded in this session.
-                </div>
-              ) : (
-                <div>
-                  <div className="hidden md:grid grid-cols-5 gap-4 px-4 pb-2 text-[11px] font-extrabold uppercase text-gray-400 tracking-wider">
-                    <div className="font-bold">Rank & Player</div>
-                    <div className="text-center font-bold">{queueMode === 'dependent' ? 'Court' : 'Level'}</div>
-                    <div className="font-bold">Raw Win %</div>
-                    <div className="md:col-span-2 text-center font-bold">Performance Stats</div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {qualifiedRoster.map((player) => {
-                      const rawWinRatePercent = Math.round(player.rawWinRate * 100);
-                      const partnerName = getPartnerName(player.partnerId);
-                      const courtOrLevelVal = queueMode === 'dependent' ? (player.assignedCourt || 1) : player.level;
-
-                      return (
-                        <div
-                          key={player.id}
-                          className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs grid grid-cols-1 md:grid-cols-5 items-center gap-4 relative overflow-hidden ${
-                            player.calculatedRank === 1 
-                              ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/20' 
-                              : player.calculatedRank === 2
-                              ? 'border-slate-300 bg-slate-50/20'
-                              : player.calculatedRank === 3
-                              ? 'border-amber-800/30 bg-amber-900/5'
-                              : 'border-gray-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3.5 md:col-span-1">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
-                              player.calculatedRank === 1 
-                                ? 'bg-amber-400 text-amber-950 shadow-xs' 
-                                : player.calculatedRank === 2
-                                ? 'bg-slate-300 text-slate-800'
-                                : player.calculatedRank === 3
-                                ? 'bg-amber-800/20 text-amber-900'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              #{player.calculatedRank}
-                            </div>
-
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-extrabold text-sm text-gray-900 truncate">{player.name}</span>
-                                {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
-                              </div>
-
-                              {partnerName && (
-                                <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
-                                  <Link className="w-3 h-3 shrink-0" /> Partner: {partnerName}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center md:justify-center">
-                            <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
-                              {courtOrLevelVal}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1.5 md:col-span-1">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
-                                }`}
-                                style={{ width: `${rawWinRatePercent}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
-                            <div className="px-1">
-                              <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
-                              <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
-                            </div>
-
-                            <div className="px-1">
-                              <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
-                              <span className="text-gray-800 font-bold">
-                                <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
-                              </span>
-                            </div>
-
-                            <div className="px-1">
-                              <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
-                              <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
-                            </div>
-
-                            <div className="px-1">
-                              <span className="text-[10px] text-gray-400 block uppercase font-bold">Time</span>
-                              <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+          {podiumData.hasPodium && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {renderPodiumStep(podiumData.rank2, 2)}
+              {renderPodiumStep(podiumData.rank1, 1)}
+              {renderPodiumStep(podiumData.rank3, 3)}
             </div>
+          )}
 
-            {provisionalRoster.length > 0 && (
-              <div className="pt-4 border-t border-gray-200 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <ShieldAlert className="w-5 h-5 text-amber-600" />
-                  <h3 className="text-md font-bold text-gray-800 uppercase tracking-wide">
-                    Not Ranked (Provisional - Played &lt; 5 Games)
-                  </h3>
+          <div className="space-y-3 mb-6">
+            {qualifiedRoster.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 italic">
+                No qualified players (5+ games) recorded in this session.
+              </div>
+            ) : (
+              <div>
+                <div className="hidden md:grid grid-cols-5 gap-4 px-4 pb-2 text-[11px] font-extrabold uppercase text-gray-400 tracking-wider">
+                  <div className="font-bold">Rank & Player</div>
+                  <div className="text-center font-bold">{queueMode === 'dependent' ? 'Court' : 'Level'}</div>
+                  <div className="font-bold">Raw Win %</div>
+                  <div className="md:col-span-2 text-center font-bold">Performance Stats</div>
                 </div>
 
-                <div className="space-y-2">
-                  {provisionalRoster.map((player) => {
+                <div className="space-y-3">
+                  {qualifiedRoster.map((player) => {
+                    const rawWinRatePercent = Math.round(player.rawWinRate * 100);
                     const partnerName = getPartnerName(player.partnerId);
                     const courtOrLevelVal = queueMode === 'dependent' ? (player.assignedCourt || 1) : player.level;
 
                     return (
                       <div
                         key={player.id}
-                        className="bg-gray-100/60 border border-gray-200 border-dashed rounded-xl p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs"
+                        className={`bg-white border rounded-2xl p-4 transition-all shadow-2xs grid grid-cols-1 md:grid-cols-5 items-center gap-4 relative overflow-hidden ${
+                          player.calculatedRank === 1 
+                            ? 'border-amber-300 ring-2 ring-amber-300/20 bg-amber-50/20' 
+                            : player.calculatedRank === 2
+                            ? 'border-slate-300 bg-slate-50/20'
+                            : player.calculatedRank === 3
+                            ? 'border-amber-800/30 bg-amber-900/5'
+                            : 'border-gray-200'
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="font-extrabold text-gray-900">{player.name}</span>
-                          <span className={`px-2.5 py-0.5 rounded-lg font-extrabold text-[11px] border shadow-2xs ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
-                            {courtOrLevelVal}
-                          </span>
-                          {partnerName && (
-                            <span className="text-[10px] font-semibold text-cyan-700 flex items-center gap-0.5">
-                              <Link className="w-3 h-3" /> Partner: {partnerName}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-3.5 md:col-span-1">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                            player.calculatedRank === 1 
+                              ? 'bg-amber-400 text-amber-950 shadow-xs' 
+                              : player.calculatedRank === 2
+                              ? 'bg-slate-300 text-slate-800'
+                              : player.calculatedRank === 3
+                              ? 'bg-amber-800/20 text-amber-900'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            #{player.calculatedRank}
+                          </div>
+
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-sm text-gray-900 truncate">{player.name}</span>
+                              {player.calculatedRank === 1 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />}
+                            </div>
+
+                            {partnerName && (
+                              <div className="text-[11px] font-semibold text-cyan-700 flex items-center gap-1">
+                                <Link className="w-3 h-3 shrink-0" /> Partner: {partnerName}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-4 text-gray-600 font-medium">
-                          <span>Played: <strong className="text-gray-900">{player.gamesPlayed}</strong></span>
-                          <span>Record: <strong className="text-emerald-600">{player.wins}W</strong> - <strong className="text-rose-600">{player.losses}L</strong></span>
-                          <span>SoS: <strong className="text-purple-600">{player.scheduleStrength || 0}%</strong></span>
-                          <span>Time: <strong className="text-cyan-700 font-mono">{formatDuration(player.timePlayedSec)}</strong></span>
+                        <div className="flex items-center md:justify-center">
+                          <span className={`px-3 py-1 rounded-lg font-extrabold text-xs border shadow-2xs inline-block text-center min-w-[36px] ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
+                            {courtOrLevelVal}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 md:col-span-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-extrabold text-amber-600">{rawWinRatePercent}%</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                rawWinRatePercent >= 60 ? 'bg-emerald-500' : rawWinRatePercent >= 45 ? 'bg-amber-500' : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${rawWinRatePercent}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 text-xs font-semibold text-center">
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Played</span>
+                            <span className="text-cyan-700 font-extrabold text-sm">{player.gamesPlayed}</span>
+                          </div>
+
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">W / L</span>
+                            <span className="text-gray-800 font-bold">
+                              <span className="text-emerald-600">{player.wins}</span> - <span className="text-rose-600">{player.losses}</span>
+                            </span>
+                          </div>
+
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold" title="Schedule Strength">SoS</span>
+                            <span className="text-purple-600 font-bold">{player.scheduleStrength || 0}%</span>
+                          </div>
+
+                          <div className="px-1">
+                            <span className="text-[10px] text-gray-400 block uppercase font-bold">Time</span>
+                            <span className="text-cyan-700 font-bold font-mono">{formatDuration(player.timePlayedSec)}</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1556,21 +1490,57 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex justify-between items-center flex-wrap gap-4 pt-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer"
-              >
-                <Printer className="w-4 h-4" /> Print / PDF
-              </button>
-              <button
-                onClick={handleDownloadSummaryImage}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
-              >
-                <Download className="w-4 h-4" /> Save Summary as Image
-              </button>
+          {provisionalRoster.length > 0 && (
+            <div className="pt-4 border-t border-gray-200 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldAlert className="w-5 h-5 text-amber-600" />
+                <h3 className="text-md font-bold text-gray-800 uppercase tracking-wide">
+                  Not Ranked (Provisional - Played &lt; 5 Games)
+                </h3>
+              </div>
+
+              <div className="space-y-2">
+                {provisionalRoster.map((player) => {
+                  const partnerName = getPartnerName(player.partnerId);
+                  const courtOrLevelVal = queueMode === 'dependent' ? (player.assignedCourt || 1) : player.level;
+
+                  return (
+                    <div
+                      key={player.id}
+                      className="bg-gray-100/60 border border-gray-200 border-dashed rounded-xl p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-extrabold text-gray-900">{player.name}</span>
+                        <span className={`px-2.5 py-0.5 rounded-lg font-extrabold text-[11px] border shadow-2xs ${getCourtLevelBadgeStyle(courtOrLevelVal)}`}>
+                          {courtOrLevelVal}
+                        </span>
+                        {partnerName && (
+                          <span className="text-[10px] font-semibold text-cyan-700 flex items-center gap-0.5">
+                            <Link className="w-3 h-3" /> Partner: {partnerName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-gray-600 font-medium">
+                        <span>Played: <strong className="text-gray-900">{player.gamesPlayed}</strong></span>
+                        <span>Record: <strong className="text-emerald-600">{player.wins}W</strong> - <strong className="text-rose-600">{player.losses}L</strong></span>
+                        <span>SoS: <strong className="text-purple-600">{player.scheduleStrength || 0}%</strong></span>
+                        <span>Time: <strong className="text-cyan-700 font-mono">{formatDuration(player.timePlayedSec)}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          <div className="flex justify-between items-center flex-wrap gap-4 pt-2">
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> Print / Save Summary
+            </button>
             <button
               onClick={() => setShowSummaryModal(false)}
               className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
@@ -2396,16 +2366,13 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-2 md:pt-0">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
-                          m.winningTeam === 'A' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Winner: Team {m.winningTeam}
                         </span>
-
                         <button
                           onClick={() => handleSwapMatchWinner(m.id)}
-                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                          title="Swap match winner (reverses stats changes)"
+                          className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-gray-200"
+                          title="Swap Match Winner"
                         >
                           <Repeat className="w-3.5 h-3.5" /> Swap Winner
                         </button>
